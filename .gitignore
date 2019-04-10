@@ -1,7 +1,8 @@
 
 # Created by https://www.gitignore.io/api/c++,root,python
 # Edit at https://www.gitignore.io/?templates=c++,root,python
-
+*.root
+*~
 ### C++ ###
 # Prerequisites
 *.d

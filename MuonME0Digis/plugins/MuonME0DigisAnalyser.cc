@@ -4,9 +4,10 @@
 #include "FWCore/ServiceRegistry/interface/Service.h"
 
 #include "TTree.h"
+using namespace std;
 
 MuonME0DigisAnalyser::MuonME0DigisAnalyser(const edm::ParameterSet& pset) { 
-  std::cout << "ctor begin" << std::endl;
+  cout << "ctor begin" << endl;
 
   auto digi_tag = pset.getParameter<edm::InputTag>("me0DigiToken");
   me0_digi_token_ = consumes<ME0DigiCollection>(digi_tag);
@@ -32,26 +33,26 @@ MuonME0DigisAnalyser::MuonME0DigisAnalyser(const edm::ParameterSet& pset) {
   tree_->Branch("region", &b_region_, "region/I");
   tree_->Branch("chamber", &b_chamber_, "chamber/I");
 
-  std::cout << "ctor end" << std::endl;
+  cout << "ctor end" << endl;
 }
 
 MuonME0DigisAnalyser::~MuonME0DigisAnalyser() {
-  std::cout << "dtor begin" << std::endl;
-  std::cout << "dtor end" << std::endl;
+  cout << "dtor begin" << endl;
+  cout << "dtor end" << endl;
 }
 
 
 void MuonME0DigisAnalyser::resetBranch() {
-  std::fill_n(b_digi_, 18432, 0);
-  std::fill_n(b_muon_digi_, 18432, 0);
+  fill_n(b_digi_, 18432, 0);
+  fill_n(b_muon_digi_, 18432, 0);
 
   b_muon_pt_ = -100;
   b_muon_eta_ = -100;
   b_muon_phi_ = -100;
 
-  std::fill_n(b_simhit_pt_, 6, -100);
-  std::fill_n(b_simhit_eta_, 6, -100);
-  std::fill_n(b_simhit_phi_, 6, -100);
+  fill_n(b_simhit_pt_, 6, -100);
+  fill_n(b_simhit_eta_, 6, -100);
+  fill_n(b_simhit_phi_, 6, -100);
 
   b_region_ = -100;
   b_chamber_ = -100;
@@ -87,21 +88,21 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
   edm::Handle<ME0DigiCollection> me0_digi_collection;
   event.getByToken(me0_digi_token_, me0_digi_collection);
   if (not me0_digi_collection.isValid()) {
-    edm::LogError(kLogCategory_) << "invalid ME0DigiCollection" << std::endl;
+    edm::LogError(kLogCategory_) << "invalid ME0DigiCollection" << endl;
     return;
   }
 
   edm::Handle<edm::DetSetVector<ME0DigiSimLink>> link_set_vector;
   event.getByToken(me0_digi_sim_link_token_, link_set_vector);
   if (not link_set_vector.isValid()) {
-    edm::LogError(kLogCategory_) << "invalid ME0DigiSimLink" << std::endl;
+    edm::LogError(kLogCategory_) << "invalid ME0DigiSimLink" << endl;
     return;
   }
 
   edm::Handle<edm::SimTrackContainer> sim_track_container_handle;
   event.getByToken(sim_track_token_, sim_track_container_handle);
   if (not sim_track_container_handle.isValid()) {
-    edm::LogError(kLogCategory_) << "invalid SimTrackContainer" << std::endl;
+    edm::LogError(kLogCategory_) << "invalid SimTrackContainer" << endl;
     return;
   }
   // const edm::SimTrackContainer &
@@ -110,15 +111,15 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
   edm::ESHandle<ME0Geometry> me0;
   event_setup.get<MuonGeometryRecord>().get(me0);
   if (not me0.isValid()) {
-    edm::LogError(kLogCategory_) << "invalid ME0Geometry" << std::endl;
+    edm::LogError(kLogCategory_) << "invalid ME0Geometry" << endl;
   }
 
   //////////////////////////////////////////////////////////////////////////////
   // NOTE SimTrack
   //////////////////////////////////////////////////////////////////////////////
-  std::map<UInt_t, SimTrack> sim_track_map;
+  map<UInt_t, SimTrack> sim_track_map;
   for (const auto & sim_track : sim_track_container) {
-    if (std::abs(sim_track.type()) != kMuonPDGId_) continue;
+    if (abs(sim_track.type()) != kMuonPDGId_) continue;
     UInt_t track_id = sim_track.trackId();
     sim_track_map[track_id] = sim_track;
   }
@@ -128,7 +129,7 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
   // It seems that DetSetVector<ME0DigiSimLink> has duplicate ME0DigiSimLink
   // TODO explain the reason. yechan said PSimHit correspond to the Geant4 step.
   //////////////////////////////////////////////////////////////////////////////
-  std::map<Int_t, edm::DetSet<ME0DigiSimLink>::const_iterator> link_map;
+  map<Int_t, edm::DetSet<ME0DigiSimLink>::const_iterator> link_map;
   for (auto link_set = link_set_vector->begin(); link_set != link_set_vector->end(); link_set++) {
     ME0DetId me0_det_id{link_set->detId()};
     Int_t region_id = me0_det_id.region();
@@ -139,7 +140,7 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
     // edm::DetSet<ME0DigiSimLink>::const_iterator
     for (auto link = link_set->data.begin(); link != link_set->data.end(); ++link) {
       // NOTE https://github.com/cms-sw/cmssw/blob/88fc5373215fdad5d4ba0540fe6f92b718e94afe/Geometry/GEMGeometry/interface/ME0EtaPartition.h#L47-L50
-      Int_t strip = std::ceil(link->getStrip());
+      Int_t strip = ceil(link->getStrip());
       Int_t unique_id = getUniqueId(region_id, chamber_id, layer_id, roll_id, strip);
       link_map[unique_id] = link;
     }
@@ -152,7 +153,7 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
   for (const auto & chamber : me0->chambers()) {
     resetBranch();
 
-    std::set<Int_t> track_id_set;
+    set<Int_t> track_id_set;
     Bool_t has_digi = false;
 
     for (const auto & layer : chamber->layers()) {
@@ -168,15 +169,14 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
         if ((not has_digi) and (range.first != range.second)) has_digi = true;
 
         for (auto digi = range.first; digi != range.second; ++digi) {
-          Int_t strip = std::ceil(digi->strip());
-
+          Int_t strip = ceil(digi->strip());
           Int_t index = getIndex(layer_id, roll_id, strip);
           b_digi_[index] = 1;
 
           Int_t unique_id = getUniqueId(b_region_, b_chamber_, layer_id, roll_id, strip);
           auto link = link_map[unique_id];
 
-          if (std::abs(link->getParticleType()) == kMuonPDGId_) {
+          if (abs(link->getParticleType()) == kMuonPDGId_) {
             b_muon_digi_[index] = 1;
 
             // they are same..
