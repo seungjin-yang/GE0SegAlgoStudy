@@ -55,8 +55,20 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
   TTree* tree_;
 
   // NOTE Branch
-  Int_t   b_digi_[18432]; // [layer][ieta][strip] --> 6 * 8 * 384
-  Int_t   b_muon_digi_[18432]; // actually SimTrack with abs(PID) == 6
+  Bool_t   b_digi_[18432]; // [layer][ieta][strip] --> 6 * 8 * 384
+  Bool_t   b_muon_digi_[18432]; // actually SimTrack with abs(PID) == 6
+
+  std::vector<Int_t> b_digi_layer_;
+  std::vector<Int_t> b_digi_ieta_;
+  std::vector<Int_t> b_digi_strip_;
+
+  std::vector<Int_t> b_muon_digi_layer_;
+  std::vector<Int_t> b_muon_digi_ieta_;
+  std::vector<Int_t> b_muon_digi_strip_;
+
+
+  Int_t b_num_fired_digi_;
+  Int_t b_num_muon_digi_;
 
   Float_t b_muon_pt_;
   Float_t b_muon_eta_;
