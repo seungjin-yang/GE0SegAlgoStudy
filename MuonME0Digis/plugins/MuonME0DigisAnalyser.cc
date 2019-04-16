@@ -59,8 +59,19 @@ MuonME0DigisAnalyser::~MuonME0DigisAnalyser() {
 }
 
 void MuonME0DigisAnalyser::resetBranch() {
-  fill_n(b_digi_, 18432, 0);
-  fill_n(b_muon_digi_, 18432, 0);
+  fill_n(b_digi_, 18432, false);
+  fill_n(b_muon_digi_, 18432, false);
+
+  b_digi_layer_.clear();
+  b_digi_ieta_.clear();
+  b_digi_strip_.clear();
+
+  b_muon_digi_layer_.clear();
+  b_muon_digi_ieta_.clear();
+  b_muon_digi_strip_.clear();
+
+  b_num_fired_digi_ = 0;
+  b_num_muon_digi_ = 0;
 
   b_muon_pt_ = -100;
   b_muon_eta_ = -100;
@@ -177,13 +188,21 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
         for (auto digi = range.first; digi != range.second; ++digi) {
           Int_t strip = ceil(digi->strip());
           Int_t index = getIndex(layer_id, roll_id, strip);
-          b_digi_[index] = 1;
+          b_digi_[index] = true;
+          b_digi_layer_.push_back(layer_id);
+          b_digi_ieta_.push_back(roll_id);
+          b_digi_strip_.push_back(strip);
+          b_num_fired_digi_++;
 
           Int_t unique_id = getUniqueId(b_region_, b_chamber_, layer_id, roll_id, strip);
           auto link = link_map[unique_id];
 
           if (abs(link->getParticleType()) == kMuonPDGId_) {
-            b_muon_digi_[index] = 1;
+            b_muon_digi_[index] = true;
+            b_muon_digi_layer_.push_back(layer_id);
+            b_muon_digi_ieta_.push_back(roll_id);
+            b_muon_digi_strip_.push_back(strip);
+            b_num_muon_digi_++;
 
             // they are same..
             LocalVector simhit_momentum = link->getMomentumAtEntry();
