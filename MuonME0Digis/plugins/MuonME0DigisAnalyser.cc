@@ -18,34 +18,38 @@ MuonME0DigisAnalyser::MuonME0DigisAnalyser(const edm::ParameterSet& pset) {
   auto sim_track_tag = pset.getParameter<edm::InputTag>("simTrackCollection");
   sim_track_token_ = consumes<edm::SimTrackContainer>(sim_track_tag);
 
-  tree_ = file_service_->make<TTree>("Event", "Event");
-  tree_->Branch("digi", &b_digi_, "digi[18432]/O");
-  tree_->Branch("muon_digi", &b_muon_digi_, "muon_digi[18432]/O");
+  tree_ch_ = file_service_->make<TTree>("chamber", "chamber");
+  tree_ch_->Branch("digi", &b_digi_, "digi[18432]/O");
+  tree_ch_->Branch("muon_digi", &b_muon_digi_, "muon_digi[18432]/O");
 
-  //   #define BRANCH_V_(name, type) out_tree_->Branch(#name, "vector<"#type">", & name##_ );
-  tree_->Branch("digi_layer", "vector<Int_t>", &b_digi_layer_);
-  tree_->Branch("digi_ieta", "vector<Int_t>", &b_digi_ieta_);
-  tree_->Branch("digi_strip", "vector<Int_t>", &b_digi_strip_);
+  tree_ch_->Branch("muon_pt", &b_muon_pt_, "muon_pt/F");
+  tree_ch_->Branch("muon_eta", &b_muon_eta_, "muon_eta/F");
+  tree_ch_->Branch("muon_phi", &b_muon_phi_, "muon_phi/F");
 
-  tree_->Branch("muon_digi_layer", "vector<Int_t>", &b_muon_digi_layer_);
-  tree_->Branch("muon_digi_ieta", "vector<Int_t>", &b_muon_digi_ieta_);
-  tree_->Branch("muon_digi_strip", "vector<Int_t>", &b_muon_digi_strip_);
+  tree_ch_->Branch("simhit_pt", &b_simhit_pt_, "simhit_pt[6]/F");
+  tree_ch_->Branch("simhit_eta", &b_simhit_eta_, "simhit_eta[6]/F");
+  tree_ch_->Branch("simhit_phi", &b_simhit_phi_, "simhit_phi[6]/F");
 
+  tree_ch_->Branch("region", &b_region_, "region/I");
+  tree_ch_->Branch("chamber", &b_chamber_, "chamber/I");
 
-  tree_->Branch("num_fired_digi", &b_num_fired_digi_, "num_fired_digi/I");
-  tree_->Branch("num_muon_digi", &b_num_muon_digi_, "num_muon_digi/I");
+  tree_win_ = file_service_->make<TTree>("window", "window");
+  tree_win_->Branch("digi", &b_win_digi_, "digi[180]/O");
+  tree_win_->Branch("muon_digi", &b_win_muon_digi_, "muon_digi[180]/O");
+  tree_win_->Branch("strip", &b_win_strip_, "strip/I");
+  tree_win_->Branch("ieta", &b_win_ieta_, "ieta/I");
 
-  tree_->Branch("muon_pt", &b_muon_pt_, "muon_pt/F");
-  tree_->Branch("muon_eta", &b_muon_eta_, "muon_eta/F");
-  tree_->Branch("muon_phi", &b_muon_phi_, "muon_phi/F");
+  tree_win_->Branch("muon_pt", &b_muon_pt_, "muon_pt/F");
+  tree_win_->Branch("muon_eta", &b_muon_eta_, "muon_eta/F");
+  tree_win_->Branch("muon_phi", &b_muon_phi_, "muon_phi/F");
 
-  tree_->Branch("simhit_pt", &b_simhit_pt_, "simhit_pt[6]/F");
-  tree_->Branch("simhit_eta", &b_simhit_eta_, "simhit_eta[6]/F");
-  tree_->Branch("simhit_phi", &b_simhit_phi_, "simhit_phi[6]/F");
+  tree_win_->Branch("simhit_pt", &b_simhit_pt_, "simhit_pt[6]/F");
+  tree_win_->Branch("simhit_eta", &b_simhit_eta_, "simhit_eta[6]/F");
+  tree_win_->Branch("simhit_phi", &b_simhit_phi_, "simhit_phi[6]/F");
 
-  tree_->Branch("region", &b_region_, "region/I");
-  tree_->Branch("chamber", &b_chamber_, "chamber/I");
-
+  tree_win_->Branch("region", &b_region_, "region/I");
+  tree_win_->Branch("chamber", &b_chamber_, "chamber/I");
+  
   cout << "ctor end" << endl;
 }
 
@@ -53,7 +57,6 @@ MuonME0DigisAnalyser::~MuonME0DigisAnalyser() {
   cout << "dtor begin" << endl;
   cout << "dtor end" << endl;
 }
-
 
 void MuonME0DigisAnalyser::resetBranch() {
   fill_n(b_digi_, 18432, false);
@@ -82,16 +85,6 @@ void MuonME0DigisAnalyser::resetBranch() {
   b_chamber_ = -100;
 }
 
-
-Int_t MuonME0DigisAnalyser::getIndex(Int_t layer_id, Int_t roll_id, Int_t strip) {
-  // return (8 * 384) * (layer_id - 1) + 384 * (roll_id - 1) + (strip - 1);
-  // L: layer id, R: roll id, S: strip
-  // index = (8 * 384)*(L - 1) + 384*(R - 1) + (S - 1)
-  //       = 3072*L + 384*R + S - (3072 + 384 +1)
-  //       = 3072*L + 384*R + S - 3457
-  return 3072 * layer_id + 384 * roll_id + strip - 3457;
-}
-
 Int_t MuonME0DigisAnalyser::getUniqueId(Int_t region, Int_t chamber,
                                         Int_t layer, Int_t roll, Int_t strip) {
 
@@ -107,7 +100,7 @@ Int_t MuonME0DigisAnalyser::getUniqueId(Int_t region, Int_t chamber,
 
 
 void MuonME0DigisAnalyser::analyze(const edm::Event& event,
-                                 const edm::EventSetup& event_setup) {
+                                   const edm::EventSetup& event_setup) {
 
   edm::Handle<ME0DigiCollection> me0_digi_collection;
   event.getByToken(me0_digi_token_, me0_digi_collection);
@@ -241,12 +234,67 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
         b_muon_eta_ = momentum.Eta();
         b_muon_phi_ = momentum.Phi();
 
-        tree_->Fill();
+        tree_ch_->Fill();
+      }
+      // scaning for windows
+      // finding the one with most hits in 3 strip window
+      int max_ieta=0;
+      int max_nstrip=0;
+      int max_hits=0;
+      for (int ieta = 1; ieta <= 8; ++ieta) {
+        for (int nstrip = 2; nstrip <= 383; ++nstrip) {
+
+          int current_nhits=0;
+          for (int win_nstrip = -1; win_nstrip < 2; ++win_nstrip) {
+            for (int nlayer = 1; nlayer <= 6; ++nlayer) {            
+              Int_t index = getIndex(nlayer, ieta, nstrip+win_nstrip);
+              if (b_digi_[index]) current_nhits++;
+            }
+          }
+          if (current_nhits > max_hits){
+            max_hits = current_nhits;
+            max_nstrip = nstrip;
+            max_ieta = ieta;
+          }
+        }
+      }
+      if (max_hits) {
+        // found max strip window center
+        
+        // saving window
+        for (int win_ieta = 1; win_ieta < 4; ++win_ieta) {
+          for (int win_nstrip = 1; win_nstrip < 11; ++win_nstrip) {
+            for (int win_nlayer = 1; win_nlayer < 7; ++win_nlayer) {
+              int test_ieta = max_ieta + win_ieta -1;
+              int test_nstrip = max_nstrip + win_nstrip - 5;
+              Int_t indexWin = getIndexWindow(win_nlayer, win_ieta, win_nstrip);
+              bool hasHit = 0;
+              bool hasMuonHit = 0;
+              // for padding
+              if ((test_ieta > 0 and test_ieta < 9) and
+                  (test_nstrip > 0 and test_nstrip < 385) ) {
+                Int_t index = getIndex(win_nlayer, test_ieta, test_nstrip);
+                hasHit = b_digi_[index];
+                hasMuonHit = b_muon_digi_[index];
+              }
+              b_win_digi_[indexWin] = hasHit;
+              b_win_muon_digi_[indexWin] = hasMuonHit;
+            }
+          }
+        }
+        b_win_strip_ = max_nstrip;
+        b_win_ieta_ = max_ieta;
+        tree_win_->Fill();
+        // cout << "window ieta " << b_win_ieta_
+        //      << " st " << b_win_strip_
+        //      << " nhits " << max_hits
+        //      << endl;
+        
       }
     }
+    
   } // chamber
 
 }
-
 //define this as a plug-in
 DEFINE_FWK_MODULE(MuonME0DigisAnalyser);

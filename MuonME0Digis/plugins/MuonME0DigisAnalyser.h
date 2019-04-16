@@ -42,7 +42,19 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
  private:
   virtual void analyze(const edm::Event&, const edm::EventSetup&);
   void resetBranch();
-  Int_t getIndex(Int_t layer_id, Int_t roll_id, Int_t strip);
+
+  Int_t getIndex(Int_t layer_id, Int_t roll_id, Int_t strip) {
+    // return (8 * 384) * (layer_id - 1) + 384 * (roll_id - 1) + (strip - 1);
+    // L: layer id, R: roll id, S: strip
+    // index = (8 * 384)*(L - 1) + 384*(R - 1) + (S - 1)
+    //       = 3072*L + 384*R + S - (3072 + 384 +1)
+    //       = 3072*L + 384*R + S - 3457
+    return 3072 * layer_id + 384 * roll_id + strip - 3457;
+  }
+  Int_t getIndexWindow(Int_t layer_id, Int_t roll_id, Int_t strip) {
+    return 80 * layer_id + 10 * roll_id + strip - 91;
+  }
+  
   Int_t getUniqueId(Int_t region, Int_t chamber,
                     Int_t layer, Int_t roll, Int_t strip);
 
@@ -52,7 +64,8 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
   edm::EDGetTokenT<edm::SimTrackContainer>             sim_track_token_;
 
   edm::Service<TFileService> file_service_;
-  TTree* tree_;
+  TTree* tree_ch_;
+  TTree* tree_win_;
 
   // NOTE Branch
   Bool_t   b_digi_[18432]; // [layer][ieta][strip] --> 6 * 8 * 384
@@ -78,9 +91,14 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
   Float_t b_simhit_eta_[6];
   Float_t b_simhit_phi_[6];
 
-  Int_t b_region_;
-  Int_t b_chamber_;
+  Int_t   b_region_;
+  Int_t   b_chamber_;
 
+  Bool_t  b_win_digi_[180]; // [layer][ieta 3][strip 10] --> 6 * 3 * 10
+  Bool_t  b_win_muon_digi_[180]; // actually SimTrack with abs(PID) == 6
+  Int_t   b_win_strip_;
+  Int_t   b_win_ieta_;
+  
   // NOTE Constants
 
   const Int_t kNumChambers_ = 18; // per region
