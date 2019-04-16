@@ -22,6 +22,14 @@ MuonME0DigisAnalyser::MuonME0DigisAnalyser(const edm::ParameterSet& pset) {
   tree_ch_->Branch("digi", &b_digi_, "digi[18432]/O");
   tree_ch_->Branch("muon_digi", &b_muon_digi_, "muon_digi[18432]/O");
 
+  tree_ch_->Branch("digi_layer", "std::vector<Int_t>", &b_digi_layer_);
+  tree_ch_->Branch("digi_ieta", "std::vector<Int_t>", &b_digi_ieta_);
+  tree_ch_->Branch("digi_strip", "std::vector<Int_t>", &b_digi_strip_);
+  
+  tree_ch_->Branch("muon_digi_layer", "std::vector<Int_t>", &b_muon_digi_layer_);
+  tree_ch_->Branch("muon_digi_ieta", "std::vector<Int_t>", &b_muon_digi_ieta_);
+  tree_ch_->Branch("muon_digi_strip", "std::vector<Int_t>", &b_muon_digi_strip_);
+
   tree_ch_->Branch("muon_pt", &b_muon_pt_, "muon_pt/F");
   tree_ch_->Branch("muon_eta", &b_muon_eta_, "muon_eta/F");
   tree_ch_->Branch("muon_phi", &b_muon_phi_, "muon_phi/F");
@@ -38,6 +46,15 @@ MuonME0DigisAnalyser::MuonME0DigisAnalyser(const edm::ParameterSet& pset) {
   tree_win_->Branch("muon_digi", &b_win_muon_digi_, "muon_digi[180]/O");
   tree_win_->Branch("strip", &b_win_strip_, "strip/I");
   tree_win_->Branch("ieta", &b_win_ieta_, "ieta/I");
+  
+  tree_win_->Branch("digi_layer", "std::vector<Int_t>", &b_digi_layer_);
+  tree_win_->Branch("digi_ieta", "std::vector<Int_t>", &b_digi_ieta_);
+  tree_win_->Branch("digi_strip", "std::vector<Int_t>", &b_digi_strip_);
+  
+  tree_win_->Branch("muon_digi_layer", "std::vector<Int_t>", &b_muon_digi_layer_);
+  tree_win_->Branch("muon_digi_ieta", "std::vector<Int_t>", &b_muon_digi_ieta_);
+  tree_win_->Branch("muon_digi_strip", "std::vector<Int_t>", &b_muon_digi_strip_);
+
 
   tree_win_->Branch("muon_pt", &b_muon_pt_, "muon_pt/F");
   tree_win_->Branch("muon_eta", &b_muon_eta_, "muon_eta/F");
