@@ -79,7 +79,6 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
   std::vector<Int_t> b_muon_digi_ieta_;
   std::vector<Int_t> b_muon_digi_strip_;
 
-
   Int_t b_num_fired_digi_;
   Int_t b_num_muon_digi_;
 

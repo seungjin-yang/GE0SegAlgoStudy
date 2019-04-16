@@ -83,6 +83,12 @@ void MuonME0DigisAnalyser::resetBranch() {
 
   b_region_ = -100;
   b_chamber_ = -100;
+
+  // FIXME these branches doesn't need to be reset
+  // fill_n(b_win_digi_, 180, false);
+  // fill_n(b_win_muon_digi_, 180, false);
+  // b_win_strip_ = -100;
+  // b_win_ieta_ = -100;
 }
 
 Int_t MuonME0DigisAnalyser::getUniqueId(Int_t region, Int_t chamber,
@@ -238,9 +244,9 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
       }
       // scaning for windows
       // finding the one with most hits in 3 strip window
-      int max_ieta=0;
-      int max_nstrip=0;
-      int max_hits=0;
+      int max_ieta = 0;
+      int max_nstrip = 0;
+      int max_hits = 0;
       for (int ieta = 1; ieta <= 8; ++ieta) {
         for (int nstrip = 2; nstrip <= 383; ++nstrip) {
 
@@ -267,21 +273,22 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
             for (int win_nlayer = 1; win_nlayer < 7; ++win_nlayer) {
               int test_ieta = max_ieta + win_ieta -1;
               int test_nstrip = max_nstrip + win_nstrip - 5;
-              Int_t indexWin = getIndexWindow(win_nlayer, win_ieta, win_nstrip);
-              bool hasHit = 0;
-              bool hasMuonHit = 0;
+              Int_t index_win = getIndexWindow(win_nlayer, win_ieta, win_nstrip);
+              bool has_hit = false;
+              bool has_muon_hit = false;
               // for padding
               if ((test_ieta > 0 and test_ieta < 9) and
                   (test_nstrip > 0 and test_nstrip < 385) ) {
                 Int_t index = getIndex(win_nlayer, test_ieta, test_nstrip);
-                hasHit = b_digi_[index];
-                hasMuonHit = b_muon_digi_[index];
+                has_hit = b_digi_[index];
+                has_muon_hit = b_muon_digi_[index];
               }
-              b_win_digi_[indexWin] = hasHit;
-              b_win_muon_digi_[indexWin] = hasMuonHit;
+              b_win_digi_[index_win] = has_hit;
+              b_win_muon_digi_[index_win] = has_muon_hit;
             }
           }
         }
+
         b_win_strip_ = max_nstrip;
         b_win_ieta_ = max_ieta;
         tree_win_->Fill();
