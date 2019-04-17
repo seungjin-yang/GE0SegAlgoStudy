@@ -19,8 +19,12 @@ MuonME0DigisAnalyser::MuonME0DigisAnalyser(const edm::ParameterSet& pset) {
   sim_track_token_ = consumes<edm::SimTrackContainer>(sim_track_tag);
 
   tree_ch_ = file_service_->make<TTree>("chamber", "chamber");
+ 
   tree_ch_->Branch("digi", &b_digi_, "digi[18432]/O");
   tree_ch_->Branch("muon_digi", &b_muon_digi_, "muon_digi[18432]/O");
+  
+  tree_ch_->Branch("num_fired_digi", &b_num_fired_digi_, "num_fired_digi/I");
+  tree_ch_->Branch("num_muon_digi", &b_num_muon_digi_, "num_muon_digi/I");
 
   tree_ch_->Branch("digi_layer", "std::vector<Int_t>", &b_digi_layer_);
   tree_ch_->Branch("digi_ieta", "std::vector<Int_t>", &b_digi_ieta_);
