@@ -30,6 +30,9 @@ MuonME0DigisAnalyser::MuonME0DigisAnalyser(const edm::ParameterSet& pset) {
   tree_ch_->Branch("muon_digi_ieta", "std::vector<Int_t>", &b_muon_digi_ieta_);
   tree_ch_->Branch("muon_digi_strip", "std::vector<Int_t>", &b_muon_digi_strip_);
 
+  tree_ch_->Branch("num_fired_digi", &b_num_fired_digi_, "num_fired_digi/I");
+  tree_ch_->Branch("num_muon_digi", &b_num_muon_digi_, "num_muon_digi/I");
+
   tree_ch_->Branch("muon_pt", &b_muon_pt_, "muon_pt/F");
   tree_ch_->Branch("muon_eta", &b_muon_eta_, "muon_eta/F");
   tree_ch_->Branch("muon_phi", &b_muon_phi_, "muon_phi/F");
