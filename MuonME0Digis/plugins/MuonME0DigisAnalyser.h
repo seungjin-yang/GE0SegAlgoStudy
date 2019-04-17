@@ -52,7 +52,7 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
     return 3072 * layer_id + 384 * roll_id + strip - 3457;
   }
   Int_t getIndexWindow(Int_t layer_id, Int_t roll_id, Int_t strip) {
-    return 80 * layer_id + 10 * roll_id + strip - 91;
+    return 30 * layer_id + 10 * roll_id + strip - 41;
   }
   
   Int_t getUniqueId(Int_t region, Int_t chamber,
