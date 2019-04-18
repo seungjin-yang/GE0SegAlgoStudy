@@ -19,7 +19,9 @@ MuonME0DigisAnalyser::MuonME0DigisAnalyser(const edm::ParameterSet& pset) {
   sim_track_token_ = consumes<edm::SimTrackContainer>(sim_track_tag);
 
   tree_ch_ = file_service_->make<TTree>("chamber", "chamber");
- 
+
+  tree_ch_->Branch("num_muon", &b_num_muon_, "num_muon/I");
+
   tree_ch_->Branch("digi", &b_digi_, "digi[18432]/O");
   tree_ch_->Branch("muon_digi", &b_muon_digi_, "muon_digi[18432]/O");
   
@@ -48,7 +50,9 @@ MuonME0DigisAnalyser::MuonME0DigisAnalyser(const edm::ParameterSet& pset) {
   tree_ch_->Branch("region", &b_region_, "region/I");
   tree_ch_->Branch("chamber", &b_chamber_, "chamber/I");
 
+  // NOTE window
   tree_win_ = file_service_->make<TTree>("window", "window");
+  tree_win_->Branch("num_muon", &b_num_muon_, "num_muon/I");
   tree_win_->Branch("digi", &b_win_digi_, "digi[180]/O");
   tree_win_->Branch("muon_digi", &b_win_muon_digi_, "muon_digi[180]/O");
   tree_win_->Branch("strip", &b_win_strip_, "strip/I");
@@ -83,6 +87,8 @@ MuonME0DigisAnalyser::~MuonME0DigisAnalyser() {
 }
 
 void MuonME0DigisAnalyser::resetBranch() {
+  b_num_muon_ = 0;
+
   fill_n(b_digi_, 18432, false);
   fill_n(b_muon_digi_, 18432, false);
 
@@ -251,9 +257,12 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
       } // eta partition
     } // layer
 
+    b_num_muon_ = track_id_set.size();
+
     // FIXME
     // consider only chamber having one SimTrack.
-    if (has_digi and (track_id_set.size() == 1)) {
+    if (has_digi and (b_num_muon_ <= 1)) {
+
       Int_t track_id = *(track_id_set.begin());
       if (sim_track_map.find(track_id) != sim_track_map.end()) {
         auto sim_track = sim_track_map[track_id];
@@ -266,6 +275,7 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
 
         tree_ch_->Fill();
       }
+
       // scaning for windows
       // finding the one with most hits in 3 strip window
       int max_ieta = 0;

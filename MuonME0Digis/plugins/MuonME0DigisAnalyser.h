@@ -68,6 +68,8 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
   TTree* tree_win_;
 
   // NOTE Branch
+  Int_t b_num_muon_;
+
   Bool_t   b_digi_[18432]; // [layer][ieta][strip] --> 6 * 8 * 384
   Bool_t   b_muon_digi_[18432]; // actually SimTrack with abs(PID) == 6
 
@@ -93,6 +95,7 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
   Int_t   b_region_;
   Int_t   b_chamber_;
 
+  // NOTE window
   Bool_t  b_win_digi_[180]; // [layer][ieta 3][strip 10] --> 6 * 3 * 10
   Bool_t  b_win_muon_digi_[180]; // actually SimTrack with abs(PID) == 6
   Int_t   b_win_strip_;
