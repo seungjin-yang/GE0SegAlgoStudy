@@ -250,7 +250,8 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
 
     // FIXME
     // consider only chamber having one SimTrack.
-    if (has_digi and (track_id_set.size() == 1)) {
+    if (has_digi and (track_id_set.size() < 2)) {
+      //if (has_digi) {
       Int_t track_id = *(track_id_set.begin());
       if (sim_track_map.find(track_id) != sim_track_map.end()) {
         auto sim_track = sim_track_map[track_id];

@@ -6,8 +6,8 @@ process = cms.Process("me0", eras.Phase2)
 # import of standard configurations
 process.load('Configuration.StandardSequences.Services_cff')
 process.load('FWCore.MessageService.MessageLogger_cfi')
-process.load('Configuration.Geometry.GeometryExtended2023D17Reco_cff')
-process.load('Configuration.Geometry.GeometryExtended2023D17_cff')
+process.load('Configuration.Geometry.GeometryExtended2023D28Reco_cff')
+process.load('Configuration.Geometry.GeometryExtended2023D28_cff')
 process.load('Configuration.StandardSequences.MagneticField_cff')
 #process.load('Configuration.StandardSequences.SimIdeal_cff')
 #process.load('Configuration.StandardSequences.Generator_cff')
@@ -16,15 +16,12 @@ process.load('Configuration.StandardSequences.EndOfProcess_cff')
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 
 from Configuration.AlCa.GlobalTag import GlobalTag
-
-# process.GlobalTag = GlobalTag(process.GlobalTag, '90X_upgrade2023_realistic_v1', '')
 process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase2_realistic', '')
-
 process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(-1))
 
-# fileNames = cms.untracked.vstring('file:/xrootd_UOS/store/user/yekang/CRAB_PrivateMC/me0_tenMu_GEN_SIM_DIGI_RECO/190315_092951/0000/tenMu_GEN-SIM-DIGI-RECO_1.root')
 process.source = cms.Source("PoolSource",
-    fileNames = cms.untracked.vstring('file:step2.root')
+    #fileNames = cms.untracked.vstring('file:/scratch/me0/10mu/step2_10mu.root')
+    fileNames = cms.untracked.vstring('file:/scratch/me0/minbias/step2_minbias.root')
 )
 
 process.me0Digis = cms.EDAnalyzer("MuonME0DigisAnalyser",
