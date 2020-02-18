@@ -70,18 +70,18 @@ process.generator = cms.EDFilter("Pythia8EGun",
         AddAntiParticle = cms.bool(True),
         MaxE = cms.double(200.0),
         MaxEta = cms.double(2.7),
-        MaxPhi = cms.double(3.14159265359),
+        MaxPhi = cms.double(1.39626), # + 80 deg
         MinE = cms.double(0.0),
         MinEta = cms.double(2.1),
-        MinPhi = cms.double(-3.14159265359),
-        ParticleID = cms.vint32(-13, -13, -13, -13, -13)
+        MinPhi = cms.double(-0.174533), # -10 deg
+        ParticleID = cms.vint32(*[-13]*10)
     ),
     PythiaParameters = cms.PSet(
         parameterSets = cms.vstring()
     ),
     Verbosity = cms.untracked.int32(0),
     firstRun = cms.untracked.uint32(1),
-    psethack = cms.string('Ten mu e 0 to 200')
+    psethack = cms.string('Twenty mu e 0 to 200')
 )
 
 
@@ -93,7 +93,13 @@ process.endjob_step = cms.EndPath(process.endOfProcess)
 process.FEVTDEBUGoutput_step = cms.EndPath(process.FEVTDEBUGoutput)
 
 # Schedule definition
-process.schedule = cms.Schedule(process.generation_step,process.genfiltersummary_step,process.simulation_step,process.endjob_step,process.FEVTDEBUGoutput_step)
+process.schedule = cms.Schedule(
+    process.generation_step,
+    process.genfiltersummary_step,
+    process.simulation_step,
+    process.endjob_step,
+    process.FEVTDEBUGoutput_step)
+
 from PhysicsTools.PatAlgos.tools.helpers import associatePatAlgosToolsTask
 associatePatAlgosToolsTask(process)
 # filter all path with the production filter sequence

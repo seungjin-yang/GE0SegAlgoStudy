@@ -5,33 +5,36 @@
 #include "FWCore/Framework/interface/EDAnalyzer.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
-#include "FWCore/ParameterSet/interface/ParameterSet.h"
-#include "FWCore/ServiceRegistry/interface/Service.h"
 #include "FWCore/Framework/interface/ESHandle.h"
 #include "FWCore/Framework/interface/Run.h"
+#include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "FWCore/ServiceRegistry/interface/Service.h"
+
 
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
 
+#include "SimDataFormats/TrackingHit/interface/PSimHitContainer.h"
+#include "SimDataFormats/Track/interface/SimTrackContainer.h"
 #include "SimDataFormats/GEMDigiSimLink/interface/ME0DigiSimLink.h"
 
+#include "DataFormats/Common/interface/DetSetVector.h"
+#include "DataFormats/Common/interface/DetSet.h"
+#include "DataFormats/MuonDetId/interface/ME0DetId.h"
 #include "DataFormats/GEMDigi/interface/ME0DigiCollection.h"
 #include "DataFormats/GEMRecHit/interface/ME0RecHitCollection.h"
 #include "DataFormats/GEMRecHit/interface/ME0SegmentCollection.h"
-#include "DataFormats/MuonDetId/interface/ME0DetId.h"
-#include "DataFormats/Common/interface/DetSetVector.h"
-#include "DataFormats/Common/interface/DetSet.h"
 
-#include "Geometry/GEMGeometry/interface/ME0Geometry.h"
-#include "Geometry/GEMGeometry/interface/ME0EtaPartition.h"
-#include "Geometry/GEMGeometry/interface/ME0EtaPartitionSpecs.h"
 #include "Geometry/CommonDetUnit/interface/GeomDet.h"
 #include "Geometry/Records/interface/MuonGeometryRecord.h"
 #include "Geometry/Records/interface/MuonGeometryRecord.h"
-
-#include "SimDataFormats/Track/interface/SimTrackContainer.h"
+#include "Geometry/GEMGeometry/interface/ME0Geometry.h"
+#include "Geometry/GEMGeometry/interface/ME0EtaPartition.h"
+#include "Geometry/GEMGeometry/interface/ME0EtaPartitionSpecs.h"
 
 
 class TTree;
+class TH1F;
+class TH2F;
 
 
 class MuonME0DigisAnalyser : public edm::EDAnalyzer {
@@ -40,75 +43,123 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
   ~MuonME0DigisAnalyser();
 
  private:
+
   virtual void analyze(const edm::Event&, const edm::EventSetup&);
+  void setBranch(); // with histograms ..
   void resetBranch();
 
-  Int_t getIndex(Int_t layer_id, Int_t roll_id, Int_t strip) {
-    // return (8 * 384) * (layer_id - 1) + 384 * (roll_id - 1) + (strip - 1);
-    // L: layer id, R: roll id, S: strip
-    // index = (8 * 384)*(L - 1) + 384*(R - 1) + (S - 1)
-    //       = 3072*L + 384*R + S - (3072 + 384 +1)
-    //       = 3072*L + 384*R + S - 3457
-    return 3072 * layer_id + 384 * roll_id + strip - 3457;
-  }
-  Int_t getIndexWindow(Int_t layer_id, Int_t roll_id, Int_t strip) {
-    return 30 * layer_id + 10 * roll_id + strip - 41;
-  }
+
+  int getIndex(int layer, int roll, int strip);
+  int getIndexWindow(int layer, int roll, int strip);
   
-  Int_t getUniqueId(Int_t region, Int_t chamber,
-                    Int_t layer, Int_t roll, Int_t strip);
+  int getUniqueId(int region, int chamber,
+                  int layer, int roll, int strip);
+
+  int getUniqueId(const ME0DetId & det_id, int strip);
+
+  bool isSimTrackGood(edm::SimTrackContainer::const_iterator);
+  bool isSimHitGood(edm::PSimHitContainer::const_iterator);
+  bool isSimSegmentGood(std::vector<edm::PSimHitContainer::const_iterator>);
 
   // ----------member data ---------------------------
-  edm::EDGetTokenT<ME0DigiCollection>                  me0_digi_token_;
-  edm::EDGetTokenT<edm::DetSetVector<ME0DigiSimLink> > me0_digi_sim_link_token_;
-  edm::EDGetTokenT<edm::SimTrackContainer>             sim_track_token_;
 
+  // NOTE ParameterSet
+  edm::EDGetTokenT<edm::SimTrackContainer>             sim_track_token_;
+  edm::EDGetTokenT<edm::PSimHitContainer>              sim_hit_token_;
+  edm::EDGetTokenT<ME0DigiCollection>                  me0_digi_token_;
+  edm::EDGetTokenT<edm::DetSetVector<ME0DigiSimLink> > me0_link_token_;
+  edm::EDGetTokenT<ME0SegmentCollection>               me0_segment_token_;
+
+  double pt_min_;
+
+
+  // NOTE FileService
   edm::Service<TFileService> file_service_;
+
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Branch
+  //////////////////////////////////////////////////////////////////////////////
   TTree* tree_ch_;
   TTree* tree_win_;
+  TTree* tree_multi_;
 
-  // NOTE Branch
-  Int_t b_num_muon_;
 
-  Bool_t   b_digi_[18432]; // [layer][ieta][strip] --> 6 * 8 * 384
-  Bool_t   b_muon_digi_[18432]; // actually SimTrack with abs(PID) == 6
+  // NOTE tree_ch_
 
-  std::vector<Int_t> b_digi_layer_;
-  std::vector<Int_t> b_digi_ieta_;
-  std::vector<Int_t> b_digi_strip_;
+  // ME0 digi
+  bool b_digi_[18432]; // [layer][ieta][strip] --> 6 * 8 * 384
+  std::vector<int> b_digi_layer_;
+  std::vector<int> b_digi_ieta_;
+  std::vector<int> b_digi_strip_;
+  int b_num_digi_;
 
-  std::vector<Int_t> b_muon_digi_layer_;
-  std::vector<Int_t> b_muon_digi_ieta_;
-  std::vector<Int_t> b_muon_digi_strip_;
+  // Muon SimTrack & it's digi
+  bool b_has_muon_;
+  bool b_muon_digi_[18432];
+  std::vector<int> b_muon_digi_layer_;
+  std::vector<int> b_muon_digi_ieta_;
+  std::vector<int> b_muon_digi_strip_;
+  int b_num_muon_digi_;
+  float b_muon_pt_;
+  float b_muon_eta_;
+  float b_muon_phi_;
 
-  Int_t b_num_fired_digi_;
-  Int_t b_num_muon_digi_;
-
-  Float_t b_muon_pt_;
-  Float_t b_muon_eta_;
-  Float_t b_muon_phi_;
-
-  Float_t b_simhit_pt_[6]; // six layers
-  Float_t b_simhit_eta_[6];
-  Float_t b_simhit_phi_[6];
-
-  Int_t   b_region_;
-  Int_t   b_chamber_;
+  // Offline reconstructed me0 segment
+  bool b_has_seg_;
+  std::vector<int> b_seg_rechit_layer_;
+  std::vector<int> b_seg_rechit_ieta_;
+  std::vector<int> b_seg_rechit_strip_;
+  int b_num_seg_rechit_;
+  
+  // additional
+  int b_region_;
+  int b_chamber_;
 
   // NOTE window
-  Bool_t  b_win_digi_[180]; // [layer][ieta 3][strip 10] --> 6 * 3 * 10
-  Bool_t  b_win_muon_digi_[180]; // actually SimTrack with abs(PID) == 6
-  Int_t   b_win_strip_;
-  Int_t   b_win_ieta_;
-  
+  bool  b_win_digi_[180]; // [layer][ieta 3][strip 10] --> 6 * 3 * 10
+  bool  b_win_muon_digi_[180]; // actually SimTrack with abs(PID) == 6
+  int   b_win_strip_;
+  int   b_win_ieta_;
+
+  // NOTE multiple muons
+  int b_multi_num_muon_;
+
+  float b_multi_muon_pt_[5];
+  float b_multi_muon_eta_[5];
+  float b_multi_muon_phi_[5];
+  int b_multi_muon_num_digi_[5];
+  int b_multi_muon_digi_idx_[5][20];
+ 
+  //////////////////////////////////////////////////////////////////////////////
+  // histograms for summary & monitoring
+  //////////////////////////////////////////////////////////////////////////////
+  TH1F* h_sim_track_pt_;
+  TH1F* h_sim_track_eta_;
+  TH1F* h_sim_track_phi_;
+  TH1F* h_matched_sim_track_pt_;
+  TH1F* h_matched_sim_track_eta_;
+  TH1F* h_matched_sim_track_phi_;
+
+  // TODO
+  // TH1F* h_segment_num_rechits_;
+  // TH1F* h_matched_segment_num_rechits_;
+
+  TH1F* h_num_simhit_;
+  TH1F* h_num_muon_;
+  TH1F* h_stats_;
+
+  //////////////////////////////////////////////////////////////////////////////
   // NOTE Constants
+  //////////////////////////////////////////////////////////////////////////////
+  const int kNumChambers_ = 18; // per region
+  const int kNumLayers_ = 6; // per chamber
+  const int kNumEtaPartitions_ = 8; // per layer
+  const int kNumStrips_ = 384; // per eta partition
+  const int kMuonPDGId_ = 13;
 
-  const Int_t kNumChambers_ = 18; // per region
-  const Int_t kNumLayers_ = 6; // per chamber
-  const Int_t kNumEtaPartitions_ = 8; // per layer
-  const Int_t kNumStrips_ = 384; // per eta partition
-
-  const Int_t kMuonPDGId_ = 13;
+  const int kMaxNumMuons_ = 5;
+  const unsigned int kMaxNumDigisPerMuon_ = 20;
 
   const std::string kLogCategory_ = "MuonME0DigisAnalyser";
 };
