@@ -60,6 +60,7 @@ void MuonME0DigisAnalyser::setBranch() {
   tree_ch_->Branch("num_digi", &b_num_digi_, "num_digi/I");
 
   // Muon SimTrack & matched digis
+  tree_ch_->Branch("digi_is_muon", "vector<int>", &b_digi_is_muon_);
 
   tree_ch_->Branch("has_muon", &b_has_muon_, "has_muon/O");
   tree_ch_->Branch("muon_digi", &b_muon_digi_, "muon_digi[18432]/O");
@@ -185,6 +186,8 @@ void MuonME0DigisAnalyser::resetBranch() {
   b_digi_ieta_.clear();
   b_digi_strip_.clear();
   b_num_digi_ = 0;
+
+  b_digi_is_muon_.clear();
 
   b_has_muon_ = false;
   fill_n(b_muon_digi_, 18432, false);
@@ -481,7 +484,6 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
     resetBranch();
 
     set<unsigned int> track_id_set;
-    bool has_digi = false;
 
     // NOTE Fill digi and muon_digi
     for (const auto & layer : chamber->layers()) {
@@ -494,7 +496,6 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
         int roll_id = id.roll();
 
         ME0DigiCollection::Range range = me0_digi_collection->get(id);
-        if ((not has_digi) and (range.first != range.second)) has_digi = true;
 
         for (auto digi = range.first; digi != range.second; ++digi) {
           int strip = ceil(digi->strip());
@@ -509,7 +510,6 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
                                       strip);
           auto link = link_map[unique_id];
 
-
           unsigned int track_id = link->getTrackId();
           // is Good qualtiy muon
           if (me0_muon_db.find(track_id) != me0_muon_db.end()) {
@@ -522,15 +522,23 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
             b_num_muon_digi_++;
 
             me0_muon_db[track_id].digi_idx.push_back(b_digi_layer_.size() - 1);
-          } // if good muon digi
+
+            b_digi_is_muon_.push_back(1);
+          } else {
+            b_digi_is_muon_.push_back(0);
+          }
+
         } // digi
       } // eta partition
     } // layer
 
+    // NOTE Save only chambers with digis in four or more layers.
+    if (b_num_digi_ < 4) continue;
+    auto num_layers = set<int>(b_digi_layer_.begin(), b_digi_layer_.end()).size();
+    if (num_layers < 4) continue;
 
-    if (not has_digi) continue;
 
-    // Fill SimTrack & 
+    // NOTE
     int num_muon = track_id_set.size();
     h_num_muon_->Fill(num_muon);
     b_has_muon_ = num_muon > 0;
