@@ -626,8 +626,12 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
       }
 
       h_stats_->Fill(0);
-    // njets >= 2
+
+    
     } else if (num_muon <= kMaxNumMuons_) {
+    ////////////////////////////////////////////////////////////////////////////
+    // NOTE njets in [2, 5]
+    ////////////////////////////////////////////////////////////////////////////
 
       vector<ME0MuonData> muons;
       for (unsigned int track_id : track_id_set) {
@@ -639,6 +643,7 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
         return mu0.sim_track->momentum().Pt() > mu1.sim_track->momentum().Pt();
       });
 
+      b_multi_num_muon_ = num_muon;
 
       bool too_many_digi_found = false;
       for (unsigned int muon_idx = 0; muon_idx < muons.size(); muon_idx++) {
