@@ -94,6 +94,9 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
   std::vector<int> b_digi_strip_;
   int b_num_digi_;
 
+
+  std::vector<int> b_digi_is_muon_;
+
   // Muon SimTrack & it's digi
   bool b_has_muon_;
   bool b_muon_digi_[18432];
