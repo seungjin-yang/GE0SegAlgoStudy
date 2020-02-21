@@ -411,13 +411,13 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
       for (const auto & sim_hit : sim_segment) {
         ME0DetId me0_id{sim_hit->detUnitId()};
         auto eta_partition = me0->etaPartition(me0_id);
-        int strip = eta_partition->strip(sim_hit->localPosition());
+        int strip = ceil(eta_partition->strip(sim_hit->localPosition()));
 
         for (ME0RecHit rechit : segment->specificRecHits()) {
 
           // NOTE hit-wise matching condition
           if (me0_id != rechit.me0Id()) continue;
-          int rechit_strip = eta_partition->strip(rechit.localPosition());
+          int rechit_strip = ceil(eta_partition->strip(rechit.localPosition()));
           // matched ME0RecHit found
           if (strip == rechit_strip) {
             num_matched++;
