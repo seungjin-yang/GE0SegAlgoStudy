@@ -532,11 +532,7 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
       } // eta partition
     } // layer
 
-    // NOTE Save only chambers with digis in four or more layers.
-    if (b_num_digi_ < 4) continue;
-    auto num_layers = set<int>(b_digi_layer_.begin(), b_digi_layer_.end()).size();
-    if (num_layers < 4) continue;
-
+    if (b_num_digi_ < 1) continue;
 
     // NOTE
     int num_muon = track_id_set.size();
