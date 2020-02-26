@@ -36,6 +36,7 @@ class TTree;
 class TH1F;
 class TH2F;
 
+using namespace std;
 
 class MuonME0DigisAnalyser : public edm::EDAnalyzer {
  public:
@@ -59,7 +60,7 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
 
   bool isSimTrackGood(edm::SimTrackContainer::const_iterator);
   bool isSimHitGood(edm::PSimHitContainer::const_iterator);
-  bool isSimSegmentGood(std::vector<edm::PSimHitContainer::const_iterator>);
+  bool isSimSegmentGood(const vector<edm::PSimHitContainer::const_iterator> &);
 
   // ----------member data ---------------------------
 
@@ -88,31 +89,32 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
   // NOTE tree_ch_
 
   // ME0 digi
+  int b_num_digi_;
   bool b_digi_[18432]; // [layer][ieta][strip] --> 6 * 8 * 384
   std::vector<int> b_digi_layer_;
   std::vector<int> b_digi_ieta_;
   std::vector<int> b_digi_strip_;
-  int b_num_digi_;
-
   std::vector<int> b_digi_is_muon_;
+  std::vector<int> b_digi_particle_type_;
+  std::vector<int> b_digi_track_id_;
 
   // Muon SimTrack & it's digi
   bool b_has_muon_;
+  int b_num_muon_digi_;
   bool b_muon_digi_[18432];
   std::vector<int> b_muon_digi_layer_;
   std::vector<int> b_muon_digi_ieta_;
   std::vector<int> b_muon_digi_strip_;
-  int b_num_muon_digi_;
   float b_muon_pt_;
   float b_muon_eta_;
   float b_muon_phi_;
 
   // Offline reconstructed me0 segment
   bool b_has_seg_;
+  int b_num_seg_rechit_;
   std::vector<int> b_seg_rechit_layer_;
   std::vector<int> b_seg_rechit_ieta_;
   std::vector<int> b_seg_rechit_strip_;
-  int b_num_seg_rechit_;
   
   // additional
   int b_region_;

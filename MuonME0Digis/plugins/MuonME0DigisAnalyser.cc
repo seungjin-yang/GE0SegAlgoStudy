@@ -45,7 +45,7 @@ MuonME0DigisAnalyser::~MuonME0DigisAnalyser() {
 
 
 void MuonME0DigisAnalyser::setBranch() {
-  std::cout << "setBranch end" << std::endl;
+  cout << "setBranch end" << endl;
 
   //////////////////////////////////////////////////////////////////////////////
   // NOTE
@@ -60,6 +60,8 @@ void MuonME0DigisAnalyser::setBranch() {
   tree_ch_->Branch("num_digi", &b_num_digi_, "num_digi/I");
 
   // Muon SimTrack & matched digis
+  tree_ch_->Branch("digi_particle_type", "vector<int>", &b_digi_particle_type_);
+  tree_ch_->Branch("digi_track_id", "vector<int>", &b_digi_track_id_);
   tree_ch_->Branch("digi_is_muon", "vector<int>", &b_digi_is_muon_);
 
   tree_ch_->Branch("has_muon", &b_has_muon_, "has_muon/O");
@@ -175,7 +177,7 @@ void MuonME0DigisAnalyser::setBranch() {
   h_stats_->GetXaxis()->SetBinLabel(2, "N_{#mu} > 5");
   h_stats_->GetXaxis()->SetBinLabel(3, "N_{DIGI} > 20");
 
-  std::cout << "setBranch end" << std::endl;
+  cout << "setBranch end" << endl;
 }
 
 
@@ -187,6 +189,8 @@ void MuonME0DigisAnalyser::resetBranch() {
   b_digi_strip_.clear();
   b_num_digi_ = 0;
 
+  b_digi_particle_type_.clear();
+  b_digi_track_id_.clear();
   b_digi_is_muon_.clear();
 
   b_has_muon_ = false;
@@ -284,7 +288,7 @@ bool MuonME0DigisAnalyser::isSimTrackGood(
 bool MuonME0DigisAnalyser::isSimHitGood(
     edm::PSimHitContainer::const_iterator sim_hit) {
 
-  if (sim_hit->particleType() != kMuonPDGId_) return false;
+  if (abs(sim_hit->particleType()) != kMuonPDGId_) return false;
 
   const EncodedEventId & event_id = sim_hit->eventId();
   if (event_id.event() != 0) return false;
@@ -297,12 +301,12 @@ bool MuonME0DigisAnalyser::isSimHitGood(
 
 
 bool MuonME0DigisAnalyser::isSimSegmentGood(
-    vector<edm::PSimHitContainer::const_iterator> sim_segment) {
+    const vector<edm::PSimHitContainer::const_iterator> & sim_segment) {
 
   if (sim_segment.size() < 4) return false;
 
-  std::set<int> chambers;
-  std::set<int> layers;
+  set<int> chambers;
+  set<int> layers;
   for (const auto & hit : sim_segment) {
     ME0DetId me0_id{hit->detUnitId()};
 
@@ -386,22 +390,17 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
 
     if (not isSimSegmentGood(sim_segment)) continue;
 
-    const auto & sim_track_momentum = sim_track->momentum();
-
-    h_sim_track_pt_->Fill(sim_track_momentum.Pt());
-    h_sim_track_eta_->Fill(std::fabs(sim_track_momentum.Eta()));
-    h_sim_track_phi_->Fill(sim_track_momentum.Phi());
-
     h_num_simhit_->Fill(sim_segment.size());
-
-
-    // NOTE find reconstructed segment
     auto chamber_id = ME0DetId(sim_segment[0]->detUnitId()).chamberId();
+
+    ////////////////////////////////////////////////////////////////////////////
+    // NOTE find reconstructed segment
+    ////////////////////////////////////////////////////////////////////////////
 
     bool found = false;
     auto matched_rec_segment = me0_segment_collection->end();
     int num_matched = 0;
-    std::set<int> found_layer;
+    set<int> found_layer;
 
     for (auto segment = me0_segment_collection->begin();
               segment != me0_segment_collection->end();
@@ -413,7 +412,7 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
         auto eta_partition = me0->etaPartition(me0_id);
         int strip = ceil(eta_partition->strip(sim_hit->localPosition()));
 
-        for (ME0RecHit rechit : segment->specificRecHits()) {
+        for (const auto &  rechit : segment->specificRecHits()) {
 
           // NOTE hit-wise matching condition
           if (me0_id != rechit.me0Id()) continue;
@@ -430,27 +429,31 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
 
       // NOTE quality of RecSegment
       float quality = static_cast<float>(num_matched) / sim_segment.size();
-      // use Parameter
       if ((quality > 0.6f) and (found_layer.size() >= 4)) {
         found = true;
         matched_rec_segment = segment;
-
-        h_matched_sim_track_pt_->Fill(sim_track_momentum.Pt());
-        h_matched_sim_track_eta_->Fill(std::fabs(sim_track_momentum.Eta()));
-        h_matched_sim_track_phi_->Fill(sim_track_momentum.Phi());
-
         // exit ME0SegmentCollection loop
         break;
       }
 
     } // ME0SegmentCollection
 
+    // NOTE
     unsigned int track_id = sim_track->trackId();
-
     // do we neet to check return of insert?
     me0_muon_db.insert(
         {track_id, {sim_track, sim_segment, found, matched_rec_segment, {}}});
 
+    // NOTE
+    const auto & momentum = sim_track->momentum();
+    h_sim_track_pt_->Fill(momentum.Pt());
+    h_sim_track_eta_->Fill(fabs(momentum.Eta()));
+    h_sim_track_phi_->Fill(momentum.Phi());
+    if (found) {
+      h_matched_sim_track_pt_->Fill(momentum.Pt());
+      h_matched_sim_track_eta_->Fill(fabs(momentum.Eta()));
+      h_matched_sim_track_phi_->Fill(momentum.Phi());
+    }
 
   } // SimTrackContainer
 
@@ -508,23 +511,34 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
 
           int unique_id = getUniqueId(b_region_, b_chamber_, layer_id, roll_id,
                                       strip);
-          auto link = link_map[unique_id];
 
-          unsigned int track_id = link->getTrackId();
-          // is Good qualtiy muon
-          if (me0_muon_db.find(track_id) != me0_muon_db.end()) {
-            track_id_set.insert(track_id); 
+          if (link_map.find(unique_id) != link_map.end()) {
+            auto link = link_map[unique_id];
 
-            b_muon_digi_[index] = true;
-            b_muon_digi_layer_.push_back(layer_id);
-            b_muon_digi_ieta_.push_back(roll_id);
-            b_muon_digi_strip_.push_back(strip);
-            b_num_muon_digi_++;
+            b_digi_particle_type_.push_back(link->getParticleType());
+            b_digi_track_id_.emplace_back(link->getTrackId());
 
-            me0_muon_db[track_id].digi_idx.push_back(b_digi_layer_.size() - 1);
+            unsigned int track_id = link->getTrackId();
+            // is Good qualtiy muon
+            if (me0_muon_db.find(track_id) != me0_muon_db.end()) {
+              track_id_set.insert(track_id); 
 
-            b_digi_is_muon_.push_back(1);
+              b_muon_digi_[index] = true;
+              b_muon_digi_layer_.push_back(layer_id);
+              b_muon_digi_ieta_.push_back(roll_id);
+              b_muon_digi_strip_.push_back(strip);
+              b_num_muon_digi_++;
+
+              me0_muon_db[track_id].digi_idx.push_back(b_digi_layer_.size() - 1);
+
+              b_digi_is_muon_.push_back(1);
+            } else {
+              b_digi_is_muon_.push_back(0);
+            }
           } else {
+            // intrinsic noise or simulated bkg contribution
+            b_digi_particle_type_.push_back(0);
+            b_digi_track_id_.push_back(-1);
             b_digi_is_muon_.push_back(0);
           }
 
@@ -545,7 +559,7 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
         const ME0MuonData & muon = me0_muon_db[track_id];
         const math::XYZTLorentzVectorD & momentum = muon.sim_track->momentum();
         b_muon_pt_ = momentum.Pt();
-        b_muon_eta_ = std::fabs(momentum.Eta());
+        b_muon_eta_ = fabs(momentum.Eta());
         b_muon_phi_ = momentum.Phi();
 
         if (muon.is_reconstructed) {
@@ -559,9 +573,8 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
             b_seg_rechit_layer_.push_back(me0_id.layer());
             b_seg_rechit_ieta_.push_back(me0_id.roll());
             b_seg_rechit_strip_.push_back(strip);
-          }
-        }
-
+          } // specificRecHits
+        } // if muon.is_reconstructed
       } // if has muon
 
       tree_ch_->Fill();
@@ -619,7 +632,7 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
         b_win_strip_ = max_nstrip;
         b_win_ieta_ = max_ieta;
         tree_win_->Fill();
-      }
+      } // if (max_hits > 0)
 
       h_stats_->Fill(0);
 
@@ -674,9 +687,7 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
     }
 
   } // chamber loop
-
-
-
 }
+
 //define this as a plug-in
 DEFINE_FWK_MODULE(MuonME0DigisAnalyser);
