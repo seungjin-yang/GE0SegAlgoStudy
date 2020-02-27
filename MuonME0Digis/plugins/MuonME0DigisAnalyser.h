@@ -73,28 +73,22 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
 
   double pt_min_;
 
-
   // NOTE FileService
   edm::Service<TFileService> file_service_;
 
-
-  //////////////////////////////////////////////////////////////////////////////
-  // Branch
-  //////////////////////////////////////////////////////////////////////////////
   TTree* tree_ch_;
   TTree* tree_win_;
   TTree* tree_multi_;
 
-
   // NOTE tree_ch_
-
-  // ME0 digi
   int b_num_digi_;
   bool b_digi_[18432]; // [layer][ieta][strip] --> 6 * 8 * 384
   std::vector<int> b_digi_layer_;
   std::vector<int> b_digi_ieta_;
   std::vector<int> b_digi_strip_;
   std::vector<int> b_digi_is_muon_;
+
+  // debug
   std::vector<int> b_digi_particle_type_;
   std::vector<int> b_digi_track_id_;
 
@@ -109,13 +103,22 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
   float b_muon_eta_;
   float b_muon_phi_;
 
-  // Offline reconstructed me0 segment
-  bool b_has_seg_;
-  int b_num_seg_rechit_;
-  std::vector<int> b_seg_rechit_layer_;
-  std::vector<int> b_seg_rechit_ieta_;
-  std::vector<int> b_seg_rechit_strip_;
-  
+  // ME0Segments built by RU (Road Usage) algorithm
+  // https://github.com/cms-sw/cmssw/blob/CMSSW_10_6_1/RecoLocalMuon/GEMSegment/python/ME0SegmentsRU_cfi.py
+  bool b_has_ru_;
+  int b_num_ru_;
+
+  // has an associated rec segment
+  bool b_has_ru_asso_;
+  int b_ru_asso_nhits_;
+  std::vector<int> b_ru_asso_rechit_layer_;
+  std::vector<int> b_ru_asso_rechit_ieta_;
+  std::vector<int> b_ru_asso_rechit_strip_;
+
+  // fake means ME0Segments that are not associated with a muon.
+  int b_num_ru_fake_;
+  std::vector<int> b_ru_fake_nhits_;
+
   // additional
   int b_region_;
   int b_chamber_;
@@ -134,7 +137,14 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
   float b_multi_muon_phi_[5];
   int b_multi_muon_num_digi_[5];
   int b_multi_muon_digi_idx_[5][20];
- 
+
+  int b_multi_num_ru_asso_;
+  std::vector<int> b_multi_ru_asso_nhits_;
+  std::vector<int> b_multi_ru_asso_muon_idx_;
+
+  int b_multi_num_ru_fake_;
+  std::vector<int> b_multi_ru_fake_nhits_;
+
   //////////////////////////////////////////////////////////////////////////////
   // histograms for summary & monitoring
   //////////////////////////////////////////////////////////////////////////////
@@ -152,6 +162,8 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
   TH1F* h_num_simhit_;
   TH1F* h_num_muon_;
   TH1F* h_stats_;
+  TH1F* h_num_rec_seg_;
+  TH2F* h_num_sim_rec_;
 
   //////////////////////////////////////////////////////////////////////////////
   // NOTE Constants
