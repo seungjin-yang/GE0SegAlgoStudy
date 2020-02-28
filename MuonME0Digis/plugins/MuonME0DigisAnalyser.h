@@ -129,9 +129,9 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
   int   b_win_strip_;
   int   b_win_ieta_;
 
-  // NOTE multiple muons
+  // NOTE multiple muons (up to 5 muons)
   int b_multi_num_muon_;
-
+  std::vector<int> b_multi_digi_muon_idx_;
   float b_multi_muon_pt_[5];
   float b_multi_muon_eta_[5];
   float b_multi_muon_phi_[5];

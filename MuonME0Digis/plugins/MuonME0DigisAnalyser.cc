@@ -129,6 +129,7 @@ void MuonME0DigisAnalyser::setBranch() {
   tree_multi_->Branch("num_digi", &b_num_digi_, "num_digi/I");
 
   tree_multi_->Branch("num_muon", &b_multi_num_muon_, "num_muon/I");
+  tree_multi_->Branch("digi_muon_idx", "vector<int>", &b_multi_digi_muon_idx_);
   tree_multi_->Branch("muon_pt", &b_multi_muon_pt_, "muon_pt[5]/F");
   tree_multi_->Branch("muon_eta", &b_multi_muon_eta_, "muon_eta[5]/F");
   tree_multi_->Branch("muon_phi", &b_multi_muon_phi_, "muon_phi[5]/F");
@@ -145,6 +146,7 @@ void MuonME0DigisAnalyser::setBranch() {
 
   tree_multi_->Branch("num_ru_fake", &b_multi_num_ru_fake_, "num_ru_fake/I");
   tree_multi_->Branch("ru_fake_nhits", "vector<int>", &b_multi_ru_fake_nhits_);
+
 
 
   //////////////////////////////////////////////////////////////////////////////
@@ -251,6 +253,7 @@ void MuonME0DigisAnalyser::resetBranch() {
 
   // NOTE tree_multi_
   b_multi_num_muon_ = 0;
+  b_multi_digi_muon_idx_.clear();
 
   fill_n(b_multi_muon_pt_, 5, -100.0f);
   fill_n(b_multi_muon_eta_, 5, -100.0f);
@@ -716,6 +719,7 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
         seg_to_muon_idx.emplace(seg, -1);
       }
 
+      b_multi_digi_muon_idx_.resize(b_digi_layer_.size(), -1);
       for (unsigned int muon_idx = 0; muon_idx < muons.size(); muon_idx++) {
         auto mu = muons[muon_idx];
         auto momentum = mu.sim_track->momentum();
@@ -726,6 +730,7 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
 
         for (unsigned int idx = 0; idx < mu.digi_idx.size(); idx++) {
           b_multi_muon_digi_idx_[muon_idx][idx] = mu.digi_idx[idx];
+          b_multi_digi_muon_idx_[mu.digi_idx[idx]] = muon_idx;
         }
 
         if (mu.is_reconstructed) {
@@ -733,6 +738,8 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
         }
       } // muons
 
+
+      // NOTE
       for (auto [segment, muon_idx] : seg_to_muon_idx) {
         int nhits = segment->nRecHits();
         if (muon_idx >= 0) {
