@@ -343,19 +343,23 @@ bool MuonME0DigisAnalyser::isSimSegmentGood(
 
   if (sim_segment.size() < 4) return false;
 
-  set<int> chambers;
-  set<int> layers;
+  // 
+  map<int, std::set<int> > layers_per_chamber;
+
   for (const auto & hit : sim_segment) {
     ME0DetId me0_id{hit->detUnitId()};
-
-    chambers.insert(me0_id.chamber());
-    layers.insert(me0_id.layer());
+    layers_per_chamber[me0_id.chamber()].insert(me0_id.layer());
   }
 
-  if (chambers.size() != 1) return false;
-  if (layers.size() < 4) return false;
+  bool is_good = false;
+  for (const auto & each : layers_per_chamber) {
+    if (each.second.size() >= 4) {
+      is_good = true;
+      break;
+    }
+  }
 
-  return true;
+  return is_good;
 }
 
 
