@@ -23,6 +23,8 @@
 #include "DataFormats/GEMDigi/interface/ME0DigiCollection.h"
 #include "DataFormats/GEMRecHit/interface/ME0RecHitCollection.h"
 #include "DataFormats/GEMRecHit/interface/ME0SegmentCollection.h"
+// #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
+// #include "DataFormats/HepMCCandidate/interface/GenParticleFwd.h"
 
 #include "Geometry/CommonDetUnit/interface/GeomDet.h"
 #include "Geometry/Records/interface/MuonGeometryRecord.h"
@@ -31,6 +33,8 @@
 #include "Geometry/GEMGeometry/interface/ME0EtaPartition.h"
 #include "Geometry/GEMGeometry/interface/ME0EtaPartitionSpecs.h"
 
+
+class ME0MuonData;
 
 class TTree;
 class TH1F;
@@ -44,34 +48,46 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
   ~MuonME0DigisAnalyser();
 
  private:
-
   virtual void analyze(const edm::Event&, const edm::EventSetup&);
   void setBranch(); // with histograms ..
+  void bookHistogram();
   void resetBranch();
 
-
-  int getIndex(int layer, int roll, int strip);
-  int getIndexWindow(int layer, int roll, int strip);
+  int get3DImageIndex(int layer, int roll, int strip);
+  int get3DImageIndexWindow(int layer, int roll, int strip);
   
-  int getUniqueId(int region, int chamber,
-                  int layer, int roll, int strip);
-
-  int getUniqueId(const ME0DetId & det_id, int strip);
-
   bool isSimTrackGood(edm::SimTrackContainer::const_iterator);
+
   bool isSimHitGood(edm::PSimHitContainer::const_iterator);
-  bool isSimSegmentGood(const vector<edm::PSimHitContainer::const_iterator> &);
+
+  tuple<bool, uint32_t, bool> isSimSegmentGood(
+      const vector<edm::PSimHitContainer::const_iterator> &);
+
+  map<pair<unsigned int, uint32_t>, ME0MuonData> buildDB(
+      const edm::Handle<edm::SimTrackContainer>&,
+      const edm::Handle<edm::PSimHitContainer>&,
+      const edm::Handle<ME0DigiCollection> &,
+      const edm::Handle<edm::DetSetVector<ME0DigiSimLink> >&,
+      const edm::Handle<ME0SegmentCollection>&,
+      const ME0Geometry*);
+
 
   // ----------member data ---------------------------
 
+  //////////////////////////////////////////////////////////////////////////////
   // NOTE ParameterSet
+  //////////////////////////////////////////////////////////////////////////////
   edm::EDGetTokenT<edm::SimTrackContainer>             sim_track_token_;
   edm::EDGetTokenT<edm::PSimHitContainer>              sim_hit_token_;
   edm::EDGetTokenT<ME0DigiCollection>                  me0_digi_token_;
   edm::EDGetTokenT<edm::DetSetVector<ME0DigiSimLink> > me0_link_token_;
   edm::EDGetTokenT<ME0SegmentCollection>               me0_segment_token_;
 
-  double pt_min_;
+  // edm::EDGetTokenT<reco::GenParticleCollection>        gen_particle_token_;
+
+  double min_pt_;
+  double min_quality_;
+  unsigned int min_num_layers_;
 
   // NOTE FileService
   edm::Service<TFileService> file_service_;
@@ -80,12 +96,19 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
   TTree* tree_win_;
   TTree* tree_multi_;
 
+
+  //////////////////////////////////////////////////////////////////////////////
+  // NOTE Branches
+  //////////////////////////////////////////////////////////////////////////////
+
   // NOTE tree_ch_
   int b_num_digi_;
   bool b_digi_[18432]; // [layer][ieta][strip] --> 6 * 8 * 384
+
   std::vector<int> b_digi_layer_;
   std::vector<int> b_digi_ieta_;
   std::vector<int> b_digi_strip_;
+
   std::vector<int> b_digi_is_muon_;
 
   // debug
@@ -94,6 +117,8 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
 
   // Muon SimTrack & it's digi
   bool b_has_muon_;
+  int b_muon_layers_;
+
   int b_num_muon_digi_;
   bool b_muon_digi_[18432];
   std::vector<int> b_muon_digi_layer_;
@@ -115,9 +140,15 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
   std::vector<int> b_ru_asso_rechit_ieta_;
   std::vector<int> b_ru_asso_rechit_strip_;
 
+  float b_ru_asso_chi2_;
+  float b_ru_asso_reduced_chi2_;
+
   // fake means ME0Segments that are not associated with a muon.
   int b_num_ru_fake_;
   std::vector<int> b_ru_fake_nhits_;
+  std::vector<float> b_ru_fake_chi2_;
+  std::vector<float> b_ru_fake_reduced_chi2_;
+
 
   // additional
   int b_region_;
@@ -131,7 +162,16 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
 
   // NOTE multiple muons (up to 5 muons)
   int b_multi_num_muon_;
+
+  // it is the muon index, (not label)
+  // default value is -1
+  // You can use this array as the label by adding 1.
   std::vector<int> b_multi_digi_muon_idx_;
+
+  // not muon idx, it is label (=target)
+  // 0 represent noise
+  int b_multi_digi_label_[18432]; 
+
   float b_multi_muon_pt_[5];
   float b_multi_muon_eta_[5];
   float b_multi_muon_phi_[5];
@@ -146,24 +186,16 @@ class MuonME0DigisAnalyser : public edm::EDAnalyzer {
   std::vector<int> b_multi_ru_fake_nhits_;
 
   //////////////////////////////////////////////////////////////////////////////
-  // histograms for summary & monitoring
+  // NOTE histograms for summary & monitoring
   //////////////////////////////////////////////////////////////////////////////
+  TH1F* h_stats_;
+
+  TH1F* h_sim_seg_nhits_;
+
   TH1F* h_sim_track_pt_;
   TH1F* h_sim_track_eta_;
   TH1F* h_sim_track_phi_;
-  TH1F* h_matched_sim_track_pt_;
-  TH1F* h_matched_sim_track_eta_;
-  TH1F* h_matched_sim_track_phi_;
 
-  // TODO
-  // TH1F* h_segment_num_rechits_;
-  // TH1F* h_matched_segment_num_rechits_;
-
-  TH1F* h_num_simhit_;
-  TH1F* h_num_muon_;
-  TH1F* h_stats_;
-  TH1F* h_num_rec_seg_;
-  TH2F* h_num_sim_rec_;
 
   //////////////////////////////////////////////////////////////////////////////
   // NOTE Constants
