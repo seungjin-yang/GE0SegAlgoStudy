@@ -1,5 +1,5 @@
-#ifndef MuonTriggering_MuonME0Digis_plugins_ME0SegmentData_h
-#define MuonTriggering_MuonME0Digis_plugins_ME0SegmentData_h
+#ifndef MuonTriggering_MuonME0Digis_plugins_ME0MuonData_h
+#define MuonTriggering_MuonME0Digis_plugins_ME0MuonData_h
 
 #include "SimDataFormats/TrackingHit/interface/PSimHitContainer.h"
 #include "SimDataFormats/Track/interface/SimTrackContainer.h"
@@ -8,7 +8,7 @@
 
 struct ME0MuonData {
   edm::SimTrackContainer::const_iterator sim_track;
-  std::vector<edm::PSimHitContainer::const_iterator> sim_hits;
+  std::vector<edm::PSimHitContainer::const_iterator> sim_segment;
 
   bool is_reconstructed;
   ME0SegmentCollection::const_iterator rec_segment;
@@ -17,4 +17,5 @@ struct ME0MuonData {
 };
 
 
-#endif // MuonTriggering_MuonME0Digis_plugins_ME0SegmentData_h
+#endif // MuonTriggering_MuonME0Digis_plugins_ME0MuonData_h
+

@@ -32,7 +32,7 @@ process.maxEvents = cms.untracked.PSet(
 
 # Input source
 process.source = cms.Source("PoolSource",
-    fileNames = cms.untracked.vstring('file:/hdfs/store/user/jlee/CMSSW_10_6_1-2023D17/TenMuExtendedE/digi/step2_000.root'),
+    fileNames = cms.untracked.vstring('file:step2.root'),
     secondaryFileNames = cms.untracked.vstring()
 )
 
