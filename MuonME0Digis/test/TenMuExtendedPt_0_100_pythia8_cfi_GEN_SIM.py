@@ -1,8 +1,8 @@
 # Auto generated configuration file
-# using: 
-# Revision: 1.19 
+# NOTE I modify a script created by: 
 # Source: /local/reps/CMSSW/CMSSW/Configuration/Applications/python/ConfigBuilder.py,v 
-# with command line options: TenMuExtendedE_0_200_pythia8_cfi --conditions auto:phase2_realistic -n 10 --era Phase2 --eventcontent FEVTDEBUG --relval 10000,100 -s GEN,SIM --datatier GEN-SIM --beamspot HLLHC --geometry Extended2023D17 --fileout file:step1.root
+# with command line options: TenMuExtendedE_0_100_pythia8_cfi --conditions auto:phase2_realistic -n 10 --era Phase2 --eventcontent FEVTDEBUG --relval 10000,100 -s GEN,SIM --datatier GEN-SIM --beamspot HLLHC --geometry Extended2023D17 --fileout file:step1.root
+# 
 import FWCore.ParameterSet.Config as cms
 
 from Configuration.Eras.Era_Phase2_cff import Phase2
@@ -38,7 +38,7 @@ process.options = cms.untracked.PSet(
 
 # Production Info
 process.configurationMetadata = cms.untracked.PSet(
-    annotation = cms.untracked.string('TenMuExtendedE_0_200_pythia8_cfi nevts:10'),
+    annotation = cms.untracked.string('TenMuExtendedPt_0_100_pythia8_cfi nevts:10'), # NOTE E to Pt
     name = cms.untracked.string('Applications'),
     version = cms.untracked.string('$Revision: 1.19 $')
 )
@@ -65,23 +65,27 @@ process.genstepfilter.triggerConditions=cms.vstring("generation_step")
 from Configuration.AlCa.GlobalTag import GlobalTag
 process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase2_realistic', '')
 
-process.generator = cms.EDFilter("Pythia8EGun",
+# NOTE I can't find TenMu with flat pt distribution using `runTheMatrix.py -w upgrade -n`
+# So I made this cfi based on `TenMuExtendedE_0_100_pythia8_cfi_GEN_SIM.py`
+# You can find the way to create original cfi on the top of this script.
+# https://github.com/cms-sw/cmssw/blob/CMSSW_10_6_1/GeneratorInterface/Pythia8Interface/plugins/Py8PtGun.cc
+process.generator = cms.EDFilter("Pythia8PtGun", # NOTE Pythia8EGun to Pythia8PtGun
     PGunParameters = cms.PSet(
         AddAntiParticle = cms.bool(True),
-        MaxE = cms.double(200.0),
-        MaxEta = cms.double(2.7),
-        MaxPhi = cms.double(1.39626), # + 80 deg
-        MinE = cms.double(0.0),
-        MinEta = cms.double(2.1),
-        MinPhi = cms.double(-0.174533), # -10 deg
-        ParticleID = cms.vint32(*[-13]*10)
+        MaxPt = cms.double(100.0), # NOTE MaxE to MaxPt
+        MaxEta = cms.double(2.7), # NOTE target to ME0
+        MaxPhi = cms.double(3.14159265359),
+        MinPt = cms.double(5.0), # NOTE MaxE to MaxPt, we want muons with energy greater than 5 GeV
+        MinEta = cms.double(2.1), # NOTE target to ME0
+        MinPhi = cms.double(-3.14159265359),
+        ParticleID = cms.vint32(-13, -13, -13, -13, -13)
     ),
     PythiaParameters = cms.PSet(
         parameterSets = cms.vstring()
     ),
     Verbosity = cms.untracked.int32(0),
     firstRun = cms.untracked.uint32(1),
-    psethack = cms.string('Twenty mu e 0 to 200')
+    psethack = cms.string('Ten mu pt 0 to 100') # NOTE e to pt
 )
 
 
@@ -93,13 +97,7 @@ process.endjob_step = cms.EndPath(process.endOfProcess)
 process.FEVTDEBUGoutput_step = cms.EndPath(process.FEVTDEBUGoutput)
 
 # Schedule definition
-process.schedule = cms.Schedule(
-    process.generation_step,
-    process.genfiltersummary_step,
-    process.simulation_step,
-    process.endjob_step,
-    process.FEVTDEBUGoutput_step)
-
+process.schedule = cms.Schedule(process.generation_step,process.genfiltersummary_step,process.simulation_step,process.endjob_step,process.FEVTDEBUGoutput_step)
 from PhysicsTools.PatAlgos.tools.helpers import associatePatAlgosToolsTask
 associatePatAlgosToolsTask(process)
 # filter all path with the production filter sequence

@@ -574,10 +574,10 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
           // TODO findLink(digi, link)
           bool has_link = false;
           auto link_set = link_set_vector->find(me0_id);
-          edm::DetSet<GEMDigiSimLink>::const_iterator link;
+          edm::DetSet<ME0DigiSimLink>::const_iterator link;
           for (link = link_set->begin(); link != link_set->end(); link++) {
             if (strip != static_cast<int>(link->getStrip())) continue;
-            if (abs(link->getParticleType() != 13)) continue;
+            if (abs(link->getParticleType()) != 13) continue;
 
             has_link = true;
             break;
@@ -631,6 +631,7 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
 
     auto rec_seg_range = me0_segment_collection->get(chamber_id);
     b_num_ru_ = std::distance(rec_seg_range.first, rec_seg_range.second);
+    b_has_ru_ = b_num_ru_ >= 1;
 
     ////////////////////////////////////////////////////////////////////////////
     // NOTE
@@ -644,7 +645,7 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
 
         auto asso_rec_seg = me0_segment_collection->end();
         if (muon.is_reconstructed()) {
-          b_has_ru_ = true;
+          b_has_ru_asso_ = true;
           asso_rec_seg = muon.rec_segment();
           b_ru_asso_nhits_ = asso_rec_seg->nRecHits();
 

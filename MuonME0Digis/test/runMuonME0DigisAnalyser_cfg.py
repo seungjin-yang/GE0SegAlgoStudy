@@ -16,7 +16,9 @@ process.load('Configuration.StandardSequences.EndOfProcess_cff')
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 
 from Configuration.AlCa.GlobalTag import GlobalTag
+
 process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase2_realistic', '')
+
 process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(-1))
 
 process.source = cms.Source("PoolSource",
@@ -29,7 +31,10 @@ process.me0Digis = cms.EDAnalyzer("MuonME0DigisAnalyser",
     me0DigiTag = cms.InputTag("simMuonME0Digis"), 
     me0DigiSimLinkTag = cms.InputTag("simMuonME0Digis","ME0"),
     me0SegmentTag = cms.InputTag("me0Segments"),
-    pt_min = cms.double(5.0), # minimum pt for muon SimTrack
+    min_pt = cms.double(5.0), # minimum pt for muon SimTrack
+    min_quality = cms.double(0.6),
+    min_num_layers = cms.uint32(4),
+    # genParticleTag = cms.InputTag("genParticles"),
 )
 
 process.TFileService = cms.Service("TFileService",
