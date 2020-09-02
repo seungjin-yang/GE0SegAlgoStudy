@@ -28,6 +28,9 @@ MuonME0DigisAnalyser::MuonME0DigisAnalyser(const edm::ParameterSet& pset) {
   auto link_tag = pset.getParameter<edm::InputTag>("me0DigiSimLinkTag");
   me0_link_token_ = consumes<edm::DetSetVector<ME0DigiSimLink>>(link_tag);
 
+  auto rechit_tag = pset.getParameter<edm::InputTag>("me0RecHitTag");
+  me0_rechit_token_ = consumes<ME0RecHitCollection>(rechit_tag);
+
   auto segment_tag = pset.getParameter<edm::InputTag>("me0SegmentTag");
   me0_segment_token_ = consumes<ME0SegmentCollection>(segment_tag);
 
@@ -37,9 +40,10 @@ MuonME0DigisAnalyser::MuonME0DigisAnalyser(const edm::ParameterSet& pset) {
   min_pt_ = pset.getParameter<double>("min_pt");
   min_quality_ = pset.getParameter<double>("min_quality");
   min_num_layers_ = pset.getParameter<unsigned int>("min_num_layers");
+  min_digis_ = pset.getParameter<unsigned int>("min_digis");
+  max_muons_ = pset.getParameter<unsigned int>("max_muons");
 
   setBranch();
-  bookHistogram();
   
   cout << "ctor end" << endl;
 }
@@ -54,55 +58,50 @@ MuonME0DigisAnalyser::~MuonME0DigisAnalyser() {
 void MuonME0DigisAnalyser::setBranch() {
   cout << "setBranch end" << endl;
 
-  //////////////////////////////////////////////////////////////////////////////
   // NOTE
-  //////////////////////////////////////////////////////////////////////////////
-  tree_ch_ = file_service_->make<TTree>("chamber", "chamber");
+  tree_ = file_service_->make<TTree>("chamber", "chamber");
 
   // digi
-  tree_ch_->Branch("num_digi", &b_num_digi_, "num_digi/I");
-  tree_ch_->Branch("digi", &b_digi_, "digi[18432]/O");
-  tree_ch_->Branch("digi_layer", "vector<int>", &b_digi_layer_);
-  tree_ch_->Branch("digi_ieta", "vector<int>", &b_digi_ieta_);
-  tree_ch_->Branch("digi_strip", "vector<int>", &b_digi_strip_);
-  tree_ch_->Branch("digi_is_muon", "vector<int>", &b_digi_is_muon_);
-  tree_ch_->Branch("digi_particle_type", "vector<int>", &b_digi_particle_type_);
-  tree_ch_->Branch("digi_track_id", "vector<int>", &b_digi_track_id_);
+  tree_->Branch("digi_size", &b_digi_size_, "digi_size/I");
+  tree_->Branch("digi_layer", "vector<int>", &b_digi_layer_);
+  tree_->Branch("digi_ieta", "vector<int>", &b_digi_ieta_);
+  tree_->Branch("digi_strip", "vector<int>", &b_digi_strip_);
+  tree_->Branch("digi_label", "vector<int>", &b_digi_label_);
+  tree_->Branch("digi_particle_type", "vector<int>", &b_digi_particle_type_);
+  tree_->Branch("digi_track_id", "vector<int>", &b_digi_track_id_);
+  tree_->Branch("digi_image", &b_digi_image_, "digi_image[18432]/O");
+  tree_->Branch("digi_image_label", &b_digi_image_label_, "digi_image_label[18432]/I");
 
-  // muon digi
-  tree_ch_->Branch("has_muon", &b_has_muon_, "has_muon/O");
-  tree_ch_->Branch("num_muon_digi", &b_num_muon_digi_, "num_muon_digi/I");
-  tree_ch_->Branch("muon_digi", &b_muon_digi_, "muon_digi[18432]/O");
-  tree_ch_->Branch("muon_digi_layer", "vector<int>", &b_muon_digi_layer_);
-  tree_ch_->Branch("muon_digi_ieta", "vector<int>", &b_muon_digi_ieta_);
-  tree_ch_->Branch("muon_digi_strip", "vector<int>", &b_muon_digi_strip_);
-  tree_ch_->Branch("muon_pt", &b_muon_pt_, "muon_pt/F");
-  tree_ch_->Branch("muon_eta", &b_muon_eta_, "muon_eta/F");
-  tree_ch_->Branch("muon_phi", &b_muon_phi_, "muon_phi/F");
+  // muon
+  tree_->Branch("muon_size", &b_muon_size_, "muon_size/I"); // for compaitibility with multi_muon tree
+  tree_->Branch("muon_pt", "vector<float>", &b_muon_pt_);
+  tree_->Branch("muon_eta", "vector<float>", &b_muon_eta_);
+  tree_->Branch("muon_phi", "vector<float>", &b_muon_phi_);
+  tree_->Branch("muon_charge", "vector<int>", &b_muon_charge_);
 
-  // Reconstructed ME0 Segment
-  tree_ch_->Branch("has_ru", &b_has_ru_, "has_ru/O");
-  tree_ch_->Branch("num_ru", &b_num_ru_, "num_ru/I");
-  // 
-  tree_ch_->Branch("has_ru_asso", &b_has_ru_asso_, "has_ru_asso/O");
-  tree_ch_->Branch("ru_asso_nhits", &b_ru_asso_nhits_, "ru_asso_nhits/I");
-  tree_ch_->Branch("ru_asso_rechit_layer", "vector<int>", &b_ru_asso_rechit_layer_);
-  tree_ch_->Branch("ru_asso_rechit_ieta", "vector<int>", &b_ru_asso_rechit_ieta_);
-  tree_ch_->Branch("ru_asso_rechit_strip", "vector<int>", &b_ru_asso_rechit_strip_);
+  // rechit
+  tree_->Branch("rechit_size", &b_rechit_size_, "rechit_size/I");
+  tree_->Branch("rechit_layer", "vector<int>", &b_rechit_layer_);
+  tree_->Branch("rechit_ieta", "vector<int>", &b_rechit_ieta_);
+  tree_->Branch("rechit_strip", "vector<int>", &b_rechit_strip_);
+  tree_->Branch("rechit_x", "vector<float>", &b_rechit_x_);
+  tree_->Branch("rechit_y", "vector<float>", &b_rechit_y_);
+  tree_->Branch("rechit_z", "vector<float>", &b_rechit_z_);
+  tree_->Branch("rechit_tof", "vector<float>", &b_rechit_tof_);
+  tree_->Branch("rechit_label", "vector<int>", &b_rechit_label_);
 
-  tree_ch_->Branch("ru_asso_chi2", &b_ru_asso_chi2_, "ru_asso_chi2/F");
-  tree_ch_->Branch("ru_asso_reduced_chi2", &b_ru_asso_reduced_chi2_, "ru_asso_reduced_chi2/F");
-
-  // fake
-  tree_ch_->Branch("num_ru_fake", &b_num_ru_fake_, "num_ru_fake/I");
-  tree_ch_->Branch("ru_fake_nhits", "vector<int>", &b_ru_fake_nhits_);
-
-  tree_ch_->Branch("ru_fake_chi2", "vector<float>", &b_ru_fake_chi2_);
-  tree_ch_->Branch("ru_fake_reduced_chi2", "vector<float>", &b_ru_fake_reduced_chi2_);
+  // RoadUsage Reconstructed ME0 Segment
+  tree_->Branch("ru_size", &b_ru_size_, "ru_size/I");
+  tree_->Branch("ru_muon_idx", "vector<int>", &b_ru_muon_idx_);
+  tree_->Branch("ru_reduced_chi2", "vector<float>", &b_ru_reduced_chi2_);
+  tree_->Branch("ru_rechit_size", "vector<int>", &b_ru_rechit_size_);
+  tree_->Branch("ru_rechit_layer", &b_ru_rechit_layer_);
+  tree_->Branch("ru_rechit_ieta", &b_ru_rechit_ieta_);
+  tree_->Branch("ru_rechit_strip", &b_ru_rechit_strip_);
 
   // additional position information
-  tree_ch_->Branch("region", &b_region_, "region/I");
-  tree_ch_->Branch("chamber", &b_chamber_, "chamber/I");
+  tree_->Branch("region", &b_region_, "region/I");
+  tree_->Branch("chamber", &b_chamber_, "chamber/I");
 
   //////////////////////////////////////////////////////////////////////////////
   // NOTE Window
@@ -112,10 +111,7 @@ void MuonME0DigisAnalyser::setBranch() {
   tree_win_->Branch("digi_layer", "vector<int>", &b_digi_layer_);
   tree_win_->Branch("digi_ieta", "vector<int>", &b_digi_ieta_);
   tree_win_->Branch("digi_strip", "vector<int>", &b_digi_strip_);
-
-  tree_win_->Branch("muon_digi_layer", "vector<int>", &b_muon_digi_layer_);
-  tree_win_->Branch("muon_digi_ieta", "vector<int>", &b_muon_digi_ieta_);
-  tree_win_->Branch("muon_digi_strip", "vector<int>", &b_muon_digi_strip_);
+  tree_win_->Branch("digi_label", "vector<int>", &b_digi_label_);
 
   tree_win_->Branch("muon_pt", &b_muon_pt_, "muon_pt/F");
   tree_win_->Branch("muon_eta", &b_muon_eta_, "muon_eta/F");
@@ -124,106 +120,56 @@ void MuonME0DigisAnalyser::setBranch() {
   tree_win_->Branch("region", &b_region_, "region/I");
   tree_win_->Branch("chamber", &b_chamber_, "chamber/I");
 
-  tree_win_->Branch("digi", &b_win_digi_, "digi[180]/O");
-  tree_win_->Branch("muon_digi", &b_win_muon_digi_, "muon_digi[180]/O");
+  tree_win_->Branch("digi_image", &b_win_digi_image_, "digi_image[180]/O");
+  tree_win_->Branch("digi_image_label", &b_win_digi_image_label_, "digi_image_label[180]/O");
   tree_win_->Branch("strip", &b_win_strip_, "strip/I");
   tree_win_->Branch("ieta", &b_win_ieta_, "ieta/I");
-
-
-  //////////////////////////////////////////////////////////////////////////////
-  // NOTE multi-muon
-  //////////////////////////////////////////////////////////////////////////////
-  tree_multi_ = file_service_->make<TTree>("multi_muon", "multi_muon");
-
-  tree_multi_->Branch("digi", &b_digi_, "digi[18432]/O");
-  tree_multi_->Branch("digi_layer", "vector<int>", &b_digi_layer_);
-  tree_multi_->Branch("digi_ieta", "vector<int>", &b_digi_ieta_);
-  tree_multi_->Branch("digi_strip", "vector<int>", &b_digi_strip_);
-  tree_multi_->Branch("num_digi", &b_num_digi_, "num_digi/I");
-
-  tree_multi_->Branch("num_muon", &b_multi_num_muon_, "num_muon/I");
-  tree_multi_->Branch("digi_muon_idx", "vector<int>", &b_multi_digi_muon_idx_);
-  tree_multi_->Branch("muon_pt", &b_multi_muon_pt_, "muon_pt[5]/F");
-  tree_multi_->Branch("muon_eta", &b_multi_muon_eta_, "muon_eta[5]/F");
-  tree_multi_->Branch("muon_phi", &b_multi_muon_phi_, "muon_phi[5]/F");
-  tree_multi_->Branch("muon_num_digi", &b_multi_muon_num_digi_, "muon_num_digi[5]/I");
-  tree_multi_->Branch("muon_digi_idx", &b_multi_muon_digi_idx_, "muon_digi_idx[5][20]/I");
-
-  tree_multi_->Branch("digi_label", &b_multi_digi_label_, "digi_label[18432]/I");
-
-  tree_multi_->Branch("num_ru_asso", &b_multi_num_ru_asso_, "num_ru_asso/I");
-  tree_multi_->Branch("ru_asso_nhits", "vector<int>", &b_multi_ru_asso_nhits_);
-  tree_multi_->Branch("ru_asso_muon_idx", "vector<int>",
-                      &b_multi_ru_asso_muon_idx_);
-
-  tree_multi_->Branch("num_ru_fake", &b_multi_num_ru_fake_, "num_ru_fake/I");
-  tree_multi_->Branch("ru_fake_nhits", "vector<int>", &b_multi_ru_fake_nhits_);
 
   cout << "setBranch end" << endl;
 }
 
 void MuonME0DigisAnalyser::bookHistogram() {
-  //////////////////////////////////////////////////////////////////////////////
-  // NOTE Histograms
-  //////////////////////////////////////////////////////////////////////////////
-  h_sim_seg_nhits_ = file_service_->make<TH1F>("h_sim_seg_nhits", "", 11, 2.5, 13.5);
-  // FIXME
-  h_sim_seg_nhits_->GetXaxis()->SetBinLabel(1, "#leq 3");
-  for (int bin = 2; bin <= 10; bin++) {
-    h_sim_seg_nhits_->GetXaxis()->SetBinLabel(bin, Form("%d", bin + 2));
-  }
-  h_sim_seg_nhits_->GetXaxis()->SetBinLabel(11, "#geq 13");
-
-  h_stats_ = file_service_->make<TH1F>("h_stats", "", 3, -0.5, 2.5);
-  h_stats_->GetXaxis()->SetBinLabel(1, "Good");
-  h_stats_->GetXaxis()->SetBinLabel(2, "N_{#mu} > 5");
-  h_stats_->GetXaxis()->SetBinLabel(3, "N_{DIGI} > 20");
-
-  h_sim_track_pt_ = file_service_->make<TH1F>("h_sim_track_pt", ";p_{T};", 44, 0.0, 220.0);
-  h_sim_track_eta_ = file_service_->make<TH1F>("h_sim_track_eta", ";|#eta|;", 8, 2.0, 2.8);
-  // ME0 Chamber1 Phi -10 rad ~ + 10 rad
-  h_sim_track_phi_ = file_service_->make<TH1F>("h_sim_track_phi", ";#phi;", 72, -M_PI, M_PI);
-
 }
 
 
 void MuonME0DigisAnalyser::resetBranch() {
-  // NOTE tree_ch_
-  b_num_digi_ = 0;
-  fill_n(b_digi_, 18432, false);
+  //
+  b_digi_size_ = -1;
   b_digi_layer_.clear();
   b_digi_ieta_.clear();
   b_digi_strip_.clear();
-  b_digi_is_muon_.clear();
+  b_digi_label_.clear();
   b_digi_particle_type_.clear();
   b_digi_track_id_.clear();
+  fill_n(b_digi_image_, 18432, false);
+  fill_n(b_digi_image_label_, 18432, 0);
 
-  b_has_muon_ = false;
-  b_num_muon_digi_ = 0;
-  fill_n(b_muon_digi_, 18432, false);
-  b_muon_digi_layer_.clear();
-  b_muon_digi_ieta_.clear();
-  b_muon_digi_strip_.clear();
-  b_muon_pt_ = -100.0f;
-  b_muon_eta_ = -100.0f;
-  b_muon_phi_ = -100.0f;
+  // Muon
+  b_muon_size_ = - 1;
+  b_muon_pt_.clear();
+  b_muon_eta_.clear();
+  b_muon_phi_.clear();
+  b_muon_charge_.clear();
 
-  b_has_ru_ = false;
-  b_num_ru_ = 0;
+  // RecHit
+  b_rechit_size_ = -1;
+  b_rechit_layer_.clear();
+  b_rechit_ieta_.clear();
+  b_rechit_strip_.clear();
+  b_rechit_x_.clear();
+  b_rechit_y_.clear();
+  b_rechit_z_.clear();
+  b_rechit_tof_.clear();
+  b_rechit_label_.clear();
 
-  b_has_ru_asso_ = false;
-  b_ru_asso_nhits_ = 0;
-  b_ru_asso_rechit_layer_.clear();
-  b_ru_asso_rechit_ieta_.clear();
-  b_ru_asso_rechit_strip_.clear();
-  b_ru_asso_chi2_ = -1.0f;
-  b_ru_asso_reduced_chi2_ = -1.0f;
-
-  b_num_ru_fake_ = 0;
-  b_ru_fake_nhits_.clear();
-
-  b_ru_fake_chi2_.clear();
-  b_ru_fake_reduced_chi2_.clear();
+  // Road Usage
+  b_ru_size_ = -1;
+  b_ru_muon_idx_.clear();
+  b_ru_reduced_chi2_.clear();
+  b_ru_rechit_size_.clear();
+  b_ru_rechit_layer_.clear();
+  b_ru_rechit_ieta_.clear();
+  b_ru_rechit_strip_.clear();
 
   b_region_ = -100;
   b_chamber_ = -100;
@@ -234,27 +180,6 @@ void MuonME0DigisAnalyser::resetBranch() {
   // fill_n(b_win_muon_digi_, 180, false);
   // b_win_strip_ = -100;
   // b_win_ieta_ = -100;
-
-
-  // NOTE tree_multi_
-  b_multi_num_muon_ = 0;
-  b_multi_digi_muon_idx_.clear();
-
-  fill_n(b_multi_muon_pt_, 5, -100.0f);
-  fill_n(b_multi_muon_eta_, 5, -100.0f);
-  fill_n(b_multi_muon_phi_, 5, -100.0f);
-  fill_n(b_multi_muon_num_digi_, 5, -1);
-
-  fill_n(*b_multi_muon_digi_idx_, 100, -1);
-
-  fill_n(b_multi_digi_label_, 18432, 0);
-
-  b_multi_num_ru_asso_ = 0;
-  b_multi_ru_asso_nhits_.clear();
-  b_multi_ru_asso_muon_idx_.clear();
-
-  b_multi_num_ru_fake_ = 0;
-  b_multi_ru_fake_nhits_.clear();
 
 }
 
@@ -282,17 +207,15 @@ bool MuonME0DigisAnalyser::isSimTrackGood(
   // if ((*t).noGenpart() && !isMuonGun_)
   //   return false;
 
-  if (abs(sim_track->type()) != kMuonPDGId_) return false;
+  if (abs(sim_track->type()) != 13) return false;
   if (sim_track->momentum().pt() < min_pt_) return false;
 
   return true;
 }
 
 
-bool MuonME0DigisAnalyser::isSimHitGood(
-    edm::PSimHitContainer::const_iterator sim_hit) {
-
-  if (abs(sim_hit->particleType()) != kMuonPDGId_) return false;
+bool MuonME0DigisAnalyser::isSimHitGood(edm::PSimHitContainer::const_iterator sim_hit) {
+  if (abs(sim_hit->particleType()) != 13) return false;
 
   const EncodedEventId & event_id = sim_hit->eventId();
   if (event_id.event() != 0) return false;
@@ -369,34 +292,14 @@ MuonME0DigisAnalyser::buildDB(
 
       ME0DetId me0_id{sim_hit->detUnitId()};
       auto eta_partition = me0->etaPartition(me0_id);
-      int sim_hit_strip = ceil(eta_partition->strip(sim_hit->localPosition()));
+      int sim_hit_strip = static_cast<int>(ceil(eta_partition->strip(sim_hit->localPosition())));
 
-
-      // checi if sim_hit is digitized
-      // Step1: check if there is a strip that matches a given simhit.
-      /*
-
-      bool is_digitized = false;
-      auto digi_range = me0_digi_collection->get(me0_id);
-      for (auto digi = digi_range.first; digi != digi_range.second; ++digi) {
-        if (sim_hit_strip == digi->strip()) {
-          is_digitized = true;
-          break;
-        }
-      }
-
-      if (not is_digitized) continue;
-      */
-
-      // Step2: Although there is a strip that geometrically matches the sim_hit,
-      // it may be due to the backgroud nise. So we check link.
       bool has_link = false;
       auto link_set = link_set_vector->find(me0_id);
       for (auto link = link_set->begin(); link != link_set->end(); link++) {
-        // TODO areSimHitAndLinkMatched
-
         if (sim_hit_strip != static_cast<int>(link->getStrip())) continue;
         if (sim_hit->particleType() != link->getParticleType()) continue;
+        if (sim_hit->trackId() != link->getTrackId()) continue;
 
         has_link = true;
         break;
@@ -409,7 +312,6 @@ MuonME0DigisAnalyser::buildDB(
 
     auto [is_sim_seg_good, primary_chamber, need_to_prune] = isSimSegmentGood(sim_segment);
     if (not is_sim_seg_good) continue;
-
 
     // TODO pruneSimSegment
     if (need_to_prune) {
@@ -426,6 +328,7 @@ MuonME0DigisAnalyser::buildDB(
     }
 
     auto chamber_id = ME0DetId(sim_segment[0]->detUnitId()).chamberId();
+
     ////////////////////////////////////////////////////////////////////////////
     // NOTE find reconstructed segment
     ////////////////////////////////////////////////////////////////////////////
@@ -458,7 +361,7 @@ MuonME0DigisAnalyser::buildDB(
         } // rechit
       } // sim_hit
 
-      // quality of RecSegment
+      // NOTE quality of RecSegment
       double quality = static_cast<double>(num_matched) / sim_segment.size();
       if ((quality > min_quality_) and (found_layer.size() >= min_num_layers_)) {
         is_reconstructed = true;
@@ -470,20 +373,15 @@ MuonME0DigisAnalyser::buildDB(
 
     unsigned int track_id = sim_track->trackId();
 
-    ME0MuonData data{sim_track, sim_segment,
-                           is_reconstructed, matched_rec_segment};
-
+    ME0MuonData data{sim_track, sim_segment, is_reconstructed, matched_rec_segment};
     me0_muon_db.insert({{track_id, chamber_id.rawId()}, data});
-
-
   } // SimTrackContainer
 
   return me0_muon_db;
 }
 
 
-void MuonME0DigisAnalyser::analyze(const edm::Event& event,
-                                   const edm::EventSetup& event_setup) {
+void MuonME0DigisAnalyser::analyze(const edm::Event& event, const edm::EventSetup& event_setup) {
   edm::Handle<edm::SimTrackContainer> sim_track_container;
   event.getByToken(sim_track_token_, sim_track_container);
   if (not sim_track_container.isValid()) {
@@ -512,6 +410,13 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
     return;
   }
 
+  edm::Handle<ME0RecHitCollection> me0_rechit_collection;
+  event.getByToken(me0_rechit_token_, me0_rechit_collection);
+  if (not me0_rechit_collection.isValid()) {
+    edm::LogError(kLogCategory_) << "invalid ME0RecHitCollection" << endl;
+    return;
+  }
+
   edm::Handle<ME0SegmentCollection> me0_segment_collection;
   event.getByToken(me0_segment_token_, me0_segment_collection);
   if (not me0_segment_collection.isValid()) {
@@ -530,17 +435,6 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
                             me0_digi_collection, link_set_vector,
                             me0_segment_collection, me0);
 
-
-  for (auto [key, muon] : me0_muon_db) {
-    h_sim_track_pt_->Fill(muon.Pt());
-    h_sim_track_eta_->Fill(muon.Eta());
-    h_sim_track_phi_->Fill(muon.Phi());
-  }
-
-
-  //////////////////////////////////////////////////////////////////////////////
-  // Fill a tree for each chamber with digis
-  //////////////////////////////////////////////////////////////////////////////
   for (const auto & chamber : me0->chambers()) {
     resetBranch();
 
@@ -550,26 +444,25 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
 
     set<pair<unsigned int, uint32_t> > db_key_set;
 
-    // FIXME
-    // for (const auto & eta_partition : chamber->etaPartitions()) {
-    // chamber->etaPartitions() do not return anything
+    // for rechit labeling
+    // map<tuple<layer, ieta, strip>, rechit_idx>
+    map<tuple<int, int, int>, unsigned int> rechit_det2idx;
 
     for (const auto & me0_layer : chamber->layers()) {
       for (const auto & eta_partition : me0_layer->etaPartitions()) {
         const ME0DetId & me0_id = eta_partition->id();
-          
         int layer = me0_id.layer();
-        int roll = me0_id.roll();
+        int ieta = me0_id.roll();
 
+        // NOTE Fill ME0Digi
         auto digi_range = me0_digi_collection->get(me0_id);
         for (auto digi = digi_range.first; digi != digi_range.second; ++digi) {
           int strip = digi->strip();
-          int index = get3DImageIndex(layer, roll, strip);
-          b_digi_[index] = true;
+          int index = get3DImageIndex(layer, ieta, strip);
+          b_digi_image_[index] = true;
           b_digi_layer_.push_back(layer);
-          b_digi_ieta_.push_back(roll);
+          b_digi_ieta_.push_back(ieta);
           b_digi_strip_.push_back(strip);
-          b_num_digi_++;
 
           // TODO findLink(digi, link)
           bool has_link = false;
@@ -595,97 +488,153 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
 
             if (me0_muon_db.find(db_key) != me0_muon_db.end()) {
               db_key_set.insert(db_key); 
-
-              b_muon_digi_[index] = true;
-              b_muon_digi_layer_.push_back(layer);
-              b_muon_digi_ieta_.push_back(roll);
-              b_muon_digi_strip_.push_back(strip);
-              b_num_muon_digi_++;
-
               me0_muon_db.at(db_key).appendDigiIndex(b_digi_layer_.size() - 1);
-
-              b_digi_is_muon_.push_back(1);
-
-            } else {
-              // not good segment
-              b_digi_is_muon_.push_back(0);
             }
 
           } else {
             // intrinsic noise or simulated bkg contribution
             b_digi_particle_type_.push_back(0);
             b_digi_track_id_.push_back(-1);
-            b_digi_is_muon_.push_back(0);
+          }
+        } // digi
+
+        // NOTE Fill ME0RecHit
+        auto rechit_range = me0_rechit_collection->get(me0_id);
+        for (auto rechit = rechit_range.first; rechit != rechit_range.second; ++rechit) {
+          if (me0->idToDet(rechit->me0Id()) == nullptr) {
+            edm::LogError(kLogCategory_) << "ME0RecHit didn't matched with ME0Geometry." << endl;
+            continue;
           }
 
-        } // digi
+          const LocalPoint&& local_pos = rechit->localPosition();
+          const GlobalPoint&& global_pos = eta_partition->toGlobal(local_pos);
+          const LocalPoint&& chamber_pos = chamber->toLocal(global_pos);
+          int strip = static_cast<int>(ceil(eta_partition->strip(local_pos)));
+
+          b_rechit_x_.push_back(chamber_pos.x());
+          b_rechit_y_.push_back(chamber_pos.y());
+          b_rechit_z_.push_back(chamber_pos.z());
+          b_rechit_tof_.push_back(rechit->tof());
+
+          b_rechit_layer_.push_back(layer);
+          b_rechit_ieta_.push_back(ieta);
+          b_rechit_strip_.push_back(strip);
+
+          rechit_det2idx.insert({{layer, ieta, strip}, b_rechit_layer_.size()});
+
+        }
       } // eta partition
     } // layer
 
     // NOTE
-    if (b_num_digi_ < 1) continue;
+    if (b_digi_layer_.size() < min_digis_) continue;
+    if (db_key_set.size() > max_muons_) continue;
 
     // NOTE
-    int num_muon = db_key_set.size();
-    b_has_muon_ = num_muon > 0;
+    if (b_digi_layer_.size() < min_digis_) continue;
+    b_digi_size_ = static_cast<int>(b_digi_layer_.size());
+    b_rechit_size_ = static_cast<int>(b_rechit_layer_.size());
 
-    auto rec_seg_range = me0_segment_collection->get(chamber_id);
-    b_num_ru_ = std::distance(rec_seg_range.first, rec_seg_range.second);
-    b_has_ru_ = b_num_ru_ >= 1;
+    b_digi_label_.resize(b_digi_size_, 0);
+    b_rechit_label_.resize(b_rechit_size_, 0);
 
-    ////////////////////////////////////////////////////////////////////////////
-    // NOTE
-    ////////////////////////////////////////////////////////////////////////////
-    if (num_muon <= 1) {
-      if (b_has_muon_) {
-        const ME0MuonData & muon = me0_muon_db.at(*(db_key_set.begin()));
-        b_muon_pt_ = muon.Pt();
-        b_muon_eta_ = muon.Eta();
-        b_muon_phi_ = muon.Phi();
+    // NOTE muon
+    vector<ME0MuonData> muons;
+    for (const auto & key : db_key_set) {
+      auto muon = me0_muon_db.at(key);
+      muons.push_back(muon);
+    }
 
-        auto asso_rec_seg = me0_segment_collection->end();
-        if (muon.is_reconstructed()) {
-          b_has_ru_asso_ = true;
-          asso_rec_seg = muon.rec_segment();
-          b_ru_asso_nhits_ = asso_rec_seg->nRecHits();
+    // in decreasing pT order
+    if (muons.size() > 1) {
+      sort(muons.begin(), muons.end(), [](ME0MuonData mu0, ME0MuonData mu1) {
+        return mu0.Pt() > mu1.Pt();
+      });
+    }
 
-          b_ru_asso_chi2_ = static_cast<float>(asso_rec_seg->chi2());
-          b_ru_asso_reduced_chi2_ = b_ru_asso_chi2_ / asso_rec_seg->degreesOfFreedom();
+    for (unsigned int muon_idx = 0; muon_idx < muons.size(); muon_idx++) {
+      auto mu = muons[muon_idx];
+      b_muon_pt_.push_back(mu.Pt());
+      b_muon_eta_.push_back(mu.Eta());
+      b_muon_phi_.push_back(mu.Phi());
 
-          for (const auto & rechit : asso_rec_seg->specificRecHits()) {
-            const ME0DetId & me0_id = rechit.me0Id();
-            auto eta_partition = me0->etaPartition(me0_id);
+      int muon_label = (muon_idx + 1);
 
-            // FIXME
-            int strip = ceil(eta_partition->strip(rechit.localPosition()));
+      // digi labeling
+      for (unsigned int digi_idx : mu.digi_indices()) {
+        b_digi_label_[digi_idx] = muon_label;
 
-            b_ru_asso_rechit_layer_.push_back(me0_id.layer());
-            b_ru_asso_rechit_ieta_.push_back(me0_id.roll());
-            b_ru_asso_rechit_strip_.push_back(strip);
-          } // specificRecHits
-        } // if muon.is_reconstructed
+        int layer = b_digi_layer_[digi_idx];
+        int ieta = b_digi_ieta_[digi_idx];
+        int strip = b_digi_strip_[digi_idx];
 
-        for (auto rec_segment = rec_seg_range.first; rec_segment != rec_seg_range.second; rec_segment++) {
-          if (rec_segment == asso_rec_seg) continue; 
-          b_ru_fake_nhits_.push_back(rec_segment->nRecHits());
+        int img_idx = get3DImageIndex(layer, ieta, strip);
+        b_digi_image_label_[img_idx] = muon_label;
 
-          float chi2 = static_cast<float>(rec_segment->chi2());
-          float reduced_chi2 = chi2 / rec_segment->degreesOfFreedom();
-
-          b_ru_fake_chi2_.push_back(chi2); 
-          b_ru_fake_reduced_chi2_.push_back(reduced_chi2);
+        auto rechit_det2idx_key = make_tuple(layer, ieta, strip);
+        if (rechit_det2idx.find(rechit_det2idx_key) != rechit_det2idx.end()) {
+          unsigned int rechit_idx = rechit_det2idx[rechit_det2idx_key];
+          b_rechit_label_[rechit_idx] = muon_label;
         }
-        b_num_ru_fake_ = b_ru_fake_nhits_.size();
 
+      }
+    } // muons
 
-      } // if has muon
+    // NOTE RecSegment
+    auto rec_seg_range = me0_segment_collection->get(chamber_id);
+    b_ru_size_ = std::distance(rec_seg_range.first, rec_seg_range.second);
 
-      tree_ch_->Fill();
+    b_ru_muon_idx_.reserve(b_ru_size_);
+    b_ru_reduced_chi2_.reserve(b_ru_size_);
+    b_ru_muon_idx_.reserve(b_ru_size_);
+    b_ru_rechit_layer_.reserve(b_ru_size_);
+    b_ru_rechit_ieta_.reserve(b_ru_size_);
+    b_ru_rechit_strip_.reserve(b_ru_size_);
 
-      //////////////////////////////////////////////////////////////////////////
-      // NOTE scaning for windows
+    for (auto rec_segment = rec_seg_range.first; rec_segment != rec_seg_range.second; rec_segment++) {
+      int ru_rechit_size = rec_segment->nRecHits();
+      float reduced_chi2 = static_cast<float>(rec_segment->chi2()) / rec_segment->degreesOfFreedom();
+
+      b_ru_reduced_chi2_.push_back(reduced_chi2);
+      b_ru_rechit_size_.push_back(ru_rechit_size);
+
+      int asso_muon_idx = -1;
+      for (unsigned int muon_idx = 0; muon_idx < muons.size(); muon_idx++) {
+        auto mu = muons[muon_idx];
+        if (mu.is_reconstructed() and ((rec_segment == mu.rec_segment()))) {
+          asso_muon_idx = static_cast<int>(muon_idx);
+        }
+      }
+      b_ru_muon_idx_.push_back(asso_muon_idx);
+
+      //
+      std::vector<int> rechit_layer;
+      std::vector<int> rechit_ieta;
+      std::vector<int> rechit_strip;
+      rechit_layer.reserve(ru_rechit_size);
+      rechit_ieta.reserve(ru_rechit_size);
+      rechit_strip.reserve(ru_rechit_size);
+
+      for (const auto &  rechit : rec_segment->specificRecHits()) {
+        const auto&& me0_id = rechit.me0Id();
+        auto eta_partition = me0->etaPartition(me0_id);
+        int strip = static_cast<int>(ceil(eta_partition->strip(rechit.localPosition())));
+
+        rechit_layer.push_back(me0_id.layer());
+        rechit_ieta.push_back(me0_id.layer());
+        rechit_strip.push_back(strip);
+      }
+
+      b_ru_rechit_layer_.push_back(rechit_layer);
+      b_ru_rechit_ieta_.push_back(rechit_ieta);
+      b_ru_rechit_strip_.push_back(rechit_strip);
+    } // rec segment
+
+    tree_->Fill();
+
+    if (muons.size() <= 1) {
+      // scaning for windows
       // finding the one with most hits in 3 strip window
-      //////////////////////////////////////////////////////////////////////////
       int max_ieta = 0;
       int max_nstrip = 0;
       int max_hits = 0;
@@ -696,7 +645,7 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
           for (int win_nstrip = -1; win_nstrip < 2; ++win_nstrip) {
             for (int nlayer = 1; nlayer <= 6; ++nlayer) {            
               int index = get3DImageIndex(nlayer, ieta, nstrip+win_nstrip);
-              if (b_digi_[index]) current_nhits++;
+              if (b_digi_image_[index]) current_nhits++;
             }
           }
           if (current_nhits > max_hits){
@@ -709,7 +658,6 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
 
       if (max_hits > 0) {
         // found max strip window center
-        
         // saving window
         for (int win_ieta = 1; win_ieta < 4; ++win_ieta) {
           for (int win_nstrip = 1; win_nstrip < 11; ++win_nstrip) {
@@ -723,11 +671,11 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
               if ((test_ieta > 0 and test_ieta < 9) and
                   (test_nstrip > 0 and test_nstrip < 385) ) {
                 int index = get3DImageIndex(win_nlayer, test_ieta, test_nstrip);
-                has_hit = b_digi_[index];
-                has_muon_hit = b_muon_digi_[index];
+                has_hit = b_digi_image_[index];
+                has_muon_hit = b_digi_image_label_[index];
               }
-              b_win_digi_[index_win] = has_hit;
-              b_win_muon_digi_[index_win] = has_muon_hit;
+              b_win_digi_image_[index_win] = has_hit;
+              b_win_digi_image_label_[index_win] = has_muon_hit;
             }
           }
         }
@@ -736,89 +684,7 @@ void MuonME0DigisAnalyser::analyze(const edm::Event& event,
         b_win_ieta_ = max_ieta;
         tree_win_->Fill();
       } // if (max_hits > 0)
-
-      h_stats_->Fill(0);
-
-    
-    } else if (num_muon <= kMaxNumMuons_) {
-      bool too_many_digi_found = false;
-
-      vector<ME0MuonData> muons;
-      for (const auto & key : db_key_set) {
-        auto muon = me0_muon_db.at(key);
-        if (muon.digi_indices().size() > kMaxNumDigisPerMuon_) {
-          too_many_digi_found = true;
-          break;
-        }
-        muons.push_back(muon);
-      }
-
-      if (too_many_digi_found) {
-        h_stats_->Fill(1);
-        continue;
-      }
-
-      b_multi_num_muon_ = num_muon;
-
-      // in decreasing pT order
-      sort(muons.begin(), muons.end(), [](ME0MuonData mu0, ME0MuonData mu1) {
-        return mu0.Pt() > mu1.Pt();
-      });
-
-      std::map<ME0SegmentCollection::const_iterator, int> rec_seg_to_muon_idx;
-      for (auto rec_seg = rec_seg_range.first; rec_seg != rec_seg_range.second; rec_seg++) {
-        rec_seg_to_muon_idx.emplace(rec_seg, -1);
-      }
-
-      b_multi_digi_muon_idx_.resize(b_digi_layer_.size(), -1);
-      for (unsigned int muon_idx = 0; muon_idx < muons.size(); muon_idx++) {
-        auto mu = muons[muon_idx];
-        b_multi_muon_pt_[muon_idx] = mu.Pt();
-        b_multi_muon_eta_[muon_idx] = mu.Eta();
-        b_multi_muon_phi_[muon_idx] = mu.Phi();
-        b_multi_muon_num_digi_[muon_idx] = mu.digi_indices().size();
-
-        for (unsigned int idx = 0; idx < mu.digi_indices().size(); idx++) {
-          unsigned int digi_idx = mu.getDigiIndex(idx);
-          b_multi_muon_digi_idx_[muon_idx][idx] = digi_idx;
-          b_multi_digi_muon_idx_[digi_idx] = muon_idx;
-
-          int img_idx = get3DImageIndex(b_digi_layer_[digi_idx],
-                                        b_digi_ieta_[digi_idx],
-                                        b_digi_strip_[digi_idx]);
-
-          b_multi_digi_label_[img_idx] = (muon_idx + 1);
-
-
-        }
-
-        if (mu.is_reconstructed()) {
-          rec_seg_to_muon_idx[mu.rec_segment()] = muon_idx;
-        }
-      } // muons
-
-      // NOTE
-      for (auto [rec_segment, muon_idx] : rec_seg_to_muon_idx) {
-        int nhits = rec_segment->nRecHits();
-        if (muon_idx >= 0) {
-          b_multi_ru_asso_nhits_.push_back(nhits);
-          b_multi_ru_asso_muon_idx_.push_back(muon_idx);
-        } else {
-          b_multi_ru_fake_nhits_.push_back(nhits);
-        }
-      }
-
-      b_multi_num_ru_asso_ = b_multi_ru_asso_nhits_.size();
-      b_multi_num_ru_fake_ = b_multi_ru_fake_nhits_.size();
-
-      h_stats_->Fill(0);
-      tree_multi_->Fill();
-
-    } else {
-      // (num_muon <= kMaxNumMuons_)
-      h_stats_->Fill(2);
-    }
-
+    } // b_num <= 1
   } // chamber loop
 }
 

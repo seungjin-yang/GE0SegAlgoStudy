@@ -27,13 +27,16 @@ process.source = cms.Source("PoolSource",
 
 process.me0Digis = cms.EDAnalyzer("MuonME0DigisAnalyser",
     simTrackTag = cms.InputTag('g4SimHits'),
-    simHitTag = cms.InputTag('g4SimHits',"MuonME0Hits"),
+    simHitTag = cms.InputTag('g4SimHits', "MuonME0Hits"),
     me0DigiTag = cms.InputTag("simMuonME0Digis"), 
-    me0DigiSimLinkTag = cms.InputTag("simMuonME0Digis","ME0"),
+    me0DigiSimLinkTag = cms.InputTag("simMuonME0Digis", "ME0"),
+    me0RecHitTag = cms.InputTag("me0RecHits"),
     me0SegmentTag = cms.InputTag("me0Segments"),
     min_pt = cms.double(5.0), # minimum pt for muon SimTrack
     min_quality = cms.double(0.6),
     min_num_layers = cms.uint32(4),
+    min_digis = cms.uint32(3),
+    max_muons = cms.uint32(3),
     # genParticleTag = cms.InputTag("genParticles"),
 )
 
