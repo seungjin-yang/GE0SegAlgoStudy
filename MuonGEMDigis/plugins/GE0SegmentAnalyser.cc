@@ -440,11 +440,34 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
     }
 
     for (const GEMSuperChamber* superchamber : gem->superChambers()) {
+      const GEMDetId & superchamber_id = superchamber->id();
+
+      // NOTE SimSegment
+      std::vector<const GE0SimSegment*> gemini_sim_segment_collection;
+      for (const auto& sim_segment : sim_segment_collection) {
+        if (sim_segment.detId().rawId() == superchamber_id.rawId()) {
+          gemini_sim_segment_collection.push_back(&sim_segment);
+        }
+      }
+      if (gemini_sim_segment_collection.size() > max_muons_) {
+        // TODO logging
+        continue;
+      }
+      // in the decreasing pt order
+      if (gemini_sim_segment_collection.size() > 1) {
+        sort(gemini_sim_segment_collection.begin(),
+             gemini_sim_segment_collection.end(),
+             [](const GE0SimSegment* lhs, const GE0SimSegment* rhs) {
+                return lhs->pt() > rhs->pt();
+             });
+      }
+
+      // NOTE
       resetBranch();
 
-      const GEMDetId & superchamber_id = superchamber->id();
       b_region_ = static_cast<long>(superchamber_id.region());
       b_chamber_ = static_cast<long>(superchamber_id.chamber());
+      b_muon_size_ = static_cast<long>(gemini_sim_segment_collection.size());
 
       // for labeling
       // map<tuple<layer, ieta, strip>, digi_idx>
@@ -495,42 +518,34 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
         } // eta partition
       } // layer
 
-      // NOTE
+      //////////////////////////////////////////////////////////////////////////
+      //
+      //////////////////////////////////////////////////////////////////////////
       if (b_digi_layer_.size() < min_digis_) continue;
-
       b_digi_size_ = static_cast<long>(b_digi_layer_.size());
-      b_digi_label_.resize(b_digi_size_, 0L);
+      b_rechit_size_ = static_cast<long>(b_rechit_layer_.size());
+
+      //////////////////////////////////////////////////////////////////////////
+      // Fill the particle type and the track id of GEMDigi using
+      // GEMDigiSimLink
+      //////////////////////////////////////////////////////////////////////////
       b_digi_particle_type_.resize(b_digi_size_, 0L);
       b_digi_track_id_.resize(b_digi_size_, 0L);
 
-      b_rechit_size_ = static_cast<long>(b_rechit_layer_.size());
-      b_rechit_label_.resize(b_rechit_size_, 0L);
-
-      // NOTE SimSegment
-      // GEMINI = GEMSuperChamber, superchamber is too long name
-      std::vector<const GE0SimSegment*> gemini_sim_segment_collection;
-
-      for (const auto& sim_segment : sim_segment_collection) {
-        if (sim_segment.detId().rawId() == superchamber_id.rawId()) {
-          gemini_sim_segment_collection.push_back(&sim_segment);
-        }
+      const auto link_set = link_set_vector->find(superchamber_id);
+      for (auto link = link_set->begin(); link != link_set->end(); link++) {
+        const GEMDetId id{link->getDetUnitId()};
+        const std::tuple<int, int, int> det{id.layer(), id.roll(), link->getStrip()};
+        const unsigned int index = digi_det2idx[det];
+        b_digi_particle_type_[index] = link->getParticleType();
+        b_digi_track_id_[index] = link->getTrackId();
       }
 
-      //////////////////////////////////////////////////////////////////////////
-      // NOTE
-      //////////////////////////////////////////////////////////////////////////
-      if (gemini_sim_segment_collection.size() > max_muons_) continue;
 
-      // in the decreasing pt order
-      if (gemini_sim_segment_collection.size() > 1) {
-        sort(gemini_sim_segment_collection.begin(),
-             gemini_sim_segment_collection.end(),
-             [](const GE0SimSegment* lhs, const GE0SimSegment* rhs) {
-                return lhs->pt() > rhs->pt();
-             });
-      }
-
-      b_muon_size_ = static_cast<long>(gemini_sim_segment_collection.size());
+      //////////////////////////////////////////////////////////////////////////
+      // Put labels on digis and fill muon informations using GE0SimSegment
+      //////////////////////////////////////////////////////////////////////////
+      b_digi_label_.resize(b_digi_size_, 0L);
       for (unsigned int idx = 0; idx < gemini_sim_segment_collection.size(); idx++) {
         auto sim_segment = gemini_sim_segment_collection[idx];
         const long particle_type = static_cast<long>(sim_segment->type());
@@ -552,8 +567,10 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
       } // GE0SimSegment
 
       //////////////////////////////////////////////////////////////////////////
-      // NOTE rechit labeling
+      // Put labels on rechits
       //////////////////////////////////////////////////////////////////////////
+      b_rechit_label_.resize(b_rechit_size_, 0L);
+
       for (unsigned int rechit_index = 0; rechit_index < b_rechit_layer_.size(); rechit_index++) {
         const long layer = b_rechit_layer_[rechit_index];
         const long ieta = b_rechit_ieta_[rechit_index];
