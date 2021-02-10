@@ -35,6 +35,10 @@ class GE0SimSegment {
   std::vector<SimHitData> simHits(void) const {return simhits_;}
   std::vector<DigiData> digis(void) const {return digis_;}
 
+  // helper
+  unsigned int trackId() const {return sim_track_->trackId();}
+  int type() const {return sim_track_->type();}
+
  private:
   SimTrackData sim_track_;
   GEMDetId det_id_;

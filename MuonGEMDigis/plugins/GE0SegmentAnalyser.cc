@@ -76,22 +76,22 @@ void GE0SegmentAnalyser::beginFileService() {
   tree_ = file_service_->make<TTree>("chamber", "chamber");
 
   // digi
-  tree_->Branch("digi_size", &b_digi_size_, "digi_size/I");
+  tree_->Branch("digi_size", &b_digi_size_, "digi_size/L");
   tree_->Branch("digi_layer", "vector<long>", &b_digi_layer_);
   tree_->Branch("digi_ieta", "vector<long>", &b_digi_ieta_);
   tree_->Branch("digi_strip", "vector<long>", &b_digi_strip_);
   tree_->Branch("digi_label", "vector<long>", &b_digi_label_);
-  tree_->Branch("digi_particle_type", "vector<int>", &b_digi_particle_type_);
-  tree_->Branch("digi_track_id", "vector<int>", &b_digi_track_id_);
+  tree_->Branch("digi_particle_type", "vector<long>", &b_digi_particle_type_);
+  tree_->Branch("digi_track_id", "vector<long>", &b_digi_track_id_);
 
   // muon
-  tree_->Branch("muon_size", &b_muon_size_, "muon_size/I"); // for compaitibility with multi_muon tree
+  tree_->Branch("muon_size", &b_muon_size_, "muon_size/L"); // for compaitibility with multi_muon tree
   tree_->Branch("muon_pt", "vector<float>", &b_muon_pt_);
   tree_->Branch("muon_eta", "vector<float>", &b_muon_eta_);
   tree_->Branch("muon_phi", "vector<float>", &b_muon_phi_);
 
   // rechit
-  tree_->Branch("rechit_size", &b_rechit_size_, "rechit_size/I");
+  tree_->Branch("rechit_size", &b_rechit_size_, "rechit_size/L");
   tree_->Branch("rechit_layer", "vector<long>", &b_rechit_layer_);
   tree_->Branch("rechit_ieta", "vector<long>", &b_rechit_ieta_);
   tree_->Branch("rechit_strip", "vector<long>", &b_rechit_strip_);
@@ -104,10 +104,10 @@ void GE0SegmentAnalyser::beginFileService() {
   tree_->Branch("rechit_label", "vector<long>", &b_rechit_label_);
 
   // Road Usage Segment
-  tree_->Branch("ru_size", &b_ru_size_, "ru_size/I");
-  tree_->Branch("ru_muon_idx", "vector<int>", &b_ru_muon_idx_);
+  tree_->Branch("ru_size", &b_ru_size_, "ru_size/L");
+  tree_->Branch("ru_muon_idx", "vector<long>", &b_ru_muon_idx_);
   tree_->Branch("ru_norm_chi2", "vector<float>", &b_ru_norm_chi2_);
-  tree_->Branch("ru_rechit_size", "vector<int>", &b_ru_rechit_size_);
+  tree_->Branch("ru_rechit_size", "vector<long>", &b_ru_rechit_size_);
   tree_->Branch("ru_rechit_layer", &b_ru_rechit_layer_);
   tree_->Branch("ru_rechit_ieta", &b_ru_rechit_ieta_);
   tree_->Branch("ru_rechit_strip", &b_ru_rechit_strip_);
@@ -116,8 +116,8 @@ void GE0SegmentAnalyser::beginFileService() {
   tree_->Branch("ru_rechit_bx", &b_ru_rechit_bx_);
 
   // additional position information
-  tree_->Branch("region", &b_region_, "region/I");
-  tree_->Branch("chamber", &b_chamber_, "chamber/I");
+  tree_->Branch("region", &b_region_, "region/L");
+  tree_->Branch("chamber", &b_chamber_, "chamber/L");
 
   //////////////////////////////////////////////////////////////////////////////
   // NOTE Window
@@ -133,13 +133,13 @@ void GE0SegmentAnalyser::beginFileService() {
   tree_win_->Branch("muon_eta", &b_muon_eta_, "muon_eta/F");
   tree_win_->Branch("muon_phi", &b_muon_phi_, "muon_phi/F");
 
-  tree_win_->Branch("region", &b_region_, "region/I");
-  tree_win_->Branch("chamber", &b_chamber_, "chamber/I");
+  tree_win_->Branch("region", &b_region_, "region/L");
+  tree_win_->Branch("chamber", &b_chamber_, "chamber/L");
 
   tree_win_->Branch("digi_image", &b_win_digi_image_, "digi_image[180]/O");
   tree_win_->Branch("digi_image_label", &b_win_digi_image_label_, "digi_image_label[180]/O");
-  tree_win_->Branch("strip", &b_win_strip_, "strip/I");
-  tree_win_->Branch("ieta", &b_win_ieta_, "ieta/I");
+  tree_win_->Branch("strip", &b_win_strip_, "strip/L");
+  tree_win_->Branch("ieta", &b_win_ieta_, "ieta/L");
 
 }
 
@@ -148,7 +148,7 @@ void GE0SegmentAnalyser::bookHistogram() {
 
 void GE0SegmentAnalyser::resetBranch() {
   //
-  b_digi_size_ = -1;
+  b_digi_size_ = -1L;
   b_digi_layer_.clear();
   b_digi_ieta_.clear();
   b_digi_strip_.clear();
@@ -157,13 +157,13 @@ void GE0SegmentAnalyser::resetBranch() {
   b_digi_track_id_.clear();
 
   // Muon
-  b_muon_size_ = - 1;
+  b_muon_size_ = -1L;
   b_muon_pt_.clear();
   b_muon_eta_.clear();
   b_muon_phi_.clear();
 
   // RecHit
-  b_rechit_size_ = -1;
+  b_rechit_size_ = -1L;
   b_rechit_layer_.clear();
   b_rechit_ieta_.clear();
   b_rechit_strip_.clear();
@@ -176,7 +176,7 @@ void GE0SegmentAnalyser::resetBranch() {
   b_rechit_label_.clear();
 
   // Road Usage
-  b_ru_size_ = -1;
+  b_ru_size_ = -1L;
   b_ru_muon_idx_.clear();
   b_ru_norm_chi2_.clear();
   b_ru_rechit_size_.clear();
@@ -187,8 +187,8 @@ void GE0SegmentAnalyser::resetBranch() {
   b_ru_rechit_cls_.clear();
   b_ru_rechit_bx_.clear();
 
-  b_region_ = -100;
-  b_chamber_ = -100;
+  b_region_ = -100L;
+  b_chamber_ = -100L;
 
   // NOTE tree_window_
   // NOTE these branches doesn't need to be reset
@@ -443,8 +443,8 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
       resetBranch();
 
       const GEMDetId & superchamber_id = superchamber->id();
-      b_region_ = superchamber_id.region();
-      b_chamber_ = superchamber_id.chamber();
+      b_region_ = static_cast<long>(superchamber_id.region());
+      b_chamber_ = static_cast<long>(superchamber_id.chamber());
 
       // for labeling
       // map<tuple<layer, ieta, strip>, digi_idx>
@@ -484,9 +484,9 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
             b_rechit_layer_.push_back(layer);
             b_rechit_ieta_.push_back(ieta);
             b_rechit_strip_.push_back(strip);
-            b_rechit_first_strip_.push_back(rechit->firstClusterStrip());
-            b_rechit_cls_.push_back(rechit->clusterSize());
-            b_rechit_bx_.push_back(rechit->BunchX());
+            b_rechit_first_strip_.push_back(static_cast<long>(rechit->firstClusterStrip()));
+            b_rechit_cls_.push_back(static_cast<long>(rechit->clusterSize()));
+            b_rechit_bx_.push_back(static_cast<long>(rechit->BunchX()));
 
             b_rechit_x_.push_back(superchamber_pos.x());
             b_rechit_y_.push_back(superchamber_pos.y());
@@ -498,11 +498,13 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
       // NOTE
       if (b_digi_layer_.size() < min_digis_) continue;
 
-      b_digi_size_ = static_cast<int>(b_digi_layer_.size());
-      b_digi_label_.resize(b_digi_size_, 0);
+      b_digi_size_ = static_cast<long>(b_digi_layer_.size());
+      b_digi_label_.resize(b_digi_size_, 0L);
+      b_digi_particle_type_.resize(b_digi_size_, 0L);
+      b_digi_track_id_.resize(b_digi_size_, 0L);
 
-      b_rechit_size_ = static_cast<int>(b_rechit_layer_.size());
-      b_rechit_label_.resize(b_rechit_size_, 0);
+      b_rechit_size_ = static_cast<long>(b_rechit_layer_.size());
+      b_rechit_label_.resize(b_rechit_size_, 0L);
 
       // NOTE SimSegment
       // GEMINI = GEMSuperChamber, superchamber is too long name
@@ -528,9 +530,12 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
              });
       }
 
-      b_muon_size_ = static_cast<int>(gemini_sim_segment_collection.size());
+      b_muon_size_ = static_cast<long>(gemini_sim_segment_collection.size());
       for (unsigned int idx = 0; idx < gemini_sim_segment_collection.size(); idx++) {
         auto sim_segment = gemini_sim_segment_collection[idx];
+        const long particle_type = static_cast<long>(sim_segment->type());
+        const long track_id = static_cast<long>(sim_segment->trackId());
+
         b_muon_pt_.push_back(sim_segment->pt());
         b_muon_eta_.push_back(sim_segment->eta());
         b_muon_phi_.push_back(sim_segment->phi());
@@ -541,6 +546,8 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
           const std::tuple<int, int, int> det{id.layer(), id.roll(), digi.strip()};
           const unsigned int index = digi_det2idx[det];
           b_digi_label_[index] = label;
+          b_digi_particle_type_[index] = particle_type;
+          b_digi_track_id_[index] = track_id;
         }
       } // GE0SimSegment
 
@@ -589,29 +596,29 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
       b_ru_rechit_bx_.reserve(b_ru_size_);
 
       for (auto rec_segment = rec_seg_range.first; rec_segment != rec_seg_range.second; rec_segment++) {
-        const int ru_rechit_size = rec_segment->nRecHits();
+        const long ru_rechit_size = static_cast<long>(rec_segment->nRecHits());
         const float norm_chi2 = static_cast<float>(rec_segment->chi2()) / rec_segment->degreesOfFreedom();
 
         b_ru_norm_chi2_.push_back(norm_chi2);
         b_ru_rechit_size_.push_back(ru_rechit_size);
 
         // the index of an associated muon (GE0SimSegment)
-        int asso_muon_idx = -1;
+        long asso_muon_idx = -1;
         for (unsigned int idx = 0; idx < gemini_sim_segment_collection.size(); idx++) {
           const GE0SimSegment* sim_segment = gemini_sim_segment_collection[idx];
           if (associateRecSegToSimSeg(rec_segment, sim_segment, gem)) {
-            asso_muon_idx = static_cast<int>(idx);
+            asso_muon_idx = static_cast<long>(idx);
             break;
           }
         }
         b_ru_muon_idx_.push_back(asso_muon_idx);
 
-        std::vector<int> rechit_layer;
-        std::vector<int> rechit_ieta;
-        std::vector<int> rechit_strip;
-        std::vector<int> rechit_first_strip;
-        std::vector<int> rechit_cls;
-        std::vector<int> rechit_bx;
+        std::vector<long> rechit_layer;
+        std::vector<long> rechit_ieta;
+        std::vector<long> rechit_strip;
+        std::vector<long> rechit_first_strip;
+        std::vector<long> rechit_cls;
+        std::vector<long> rechit_bx;
         rechit_layer.reserve(ru_rechit_size);
         rechit_ieta.reserve(ru_rechit_size);
         rechit_strip.reserve(ru_rechit_size);
@@ -622,14 +629,14 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
         for (const auto &  rechit : rec_segment->specificRecHits()) {
           const auto&& gem_id = rechit.gemId();
           auto eta_partition = gem->etaPartition(gem_id);
-          const int strip = static_cast<int>(eta_partition->strip(rechit.localPosition()));
+          const long strip = static_cast<long>(eta_partition->strip(rechit.localPosition()));
 
           rechit_layer.push_back(gem_id.layer());
           rechit_ieta.push_back(gem_id.layer());
           rechit_strip.push_back(strip);
-          rechit_first_strip.push_back(rechit.firstClusterStrip());
-          rechit_cls.push_back(rechit.clusterSize());
-          rechit_bx.push_back(rechit.BunchX());
+          rechit_first_strip.push_back(static_cast<long>(rechit.firstClusterStrip()));
+          rechit_cls.push_back(static_cast<long>(rechit.clusterSize()));
+          rechit_bx.push_back(static_cast<long>(rechit.BunchX()));
         }
 
         b_ru_rechit_layer_.push_back(rechit_layer);

@@ -105,20 +105,20 @@ class GE0SegmentAnalyser : public edm::EDAnalyzer {
   // features -> float
   // index or label -> long
   //////////////////////////////////////////////////////////////////////////////
-  int b_digi_size_;
+  long b_digi_size_;
   std::vector<long> b_digi_layer_; // for 
   std::vector<long> b_digi_ieta_;
   std::vector<long> b_digi_strip_;
   std::vector<long> b_digi_label_;
-  std::vector<int> b_digi_particle_type_;
-  std::vector<int> b_digi_track_id_;
+  std::vector<long> b_digi_particle_type_;
+  std::vector<long> b_digi_track_id_;
 
-  int b_muon_size_;
+  long b_muon_size_;
   std::vector<float> b_muon_pt_;
   std::vector<float> b_muon_eta_;
   std::vector<float> b_muon_phi_;
 
-  int b_rechit_size_;
+  long b_rechit_size_;
   std::vector<long> b_rechit_layer_;
   std::vector<long> b_rechit_ieta_;
   std::vector<long> b_rechit_strip_; // from LocalPoint
@@ -132,26 +132,26 @@ class GE0SegmentAnalyser : public edm::EDAnalyzer {
 
   // GEMSegments built by RU (Road Usage) algorithm
   // https://github.com/cms-sw/cmssw/blob/CMSSW_10_6_1/RecoLocalMuon/GEMSegment/python/GEMSegmentsRU_cfi.py
-  int b_ru_size_;
-  std::vector<int> b_ru_muon_idx_;
+  long b_ru_size_;
+  std::vector<long> b_ru_muon_idx_;
   std::vector<float> b_ru_norm_chi2_; // normalized chi2
-  std::vector<int> b_ru_rechit_size_;
-  std::vector<std::vector<int> > b_ru_rechit_layer_;
-  std::vector<std::vector<int> > b_ru_rechit_ieta_;
-  std::vector<std::vector<int> > b_ru_rechit_strip_;
-  std::vector<std::vector<int> > b_ru_rechit_first_strip_;
-  std::vector<std::vector<int> > b_ru_rechit_cls_;
-  std::vector<std::vector<int> > b_ru_rechit_bx_;
+  std::vector<long> b_ru_rechit_size_;
+  std::vector<std::vector<long> > b_ru_rechit_layer_;
+  std::vector<std::vector<long> > b_ru_rechit_ieta_;
+  std::vector<std::vector<long> > b_ru_rechit_strip_;
+  std::vector<std::vector<long> > b_ru_rechit_first_strip_;
+  std::vector<std::vector<long> > b_ru_rechit_cls_;
+  std::vector<std::vector<long> > b_ru_rechit_bx_;
 
   // additional
-  int b_region_;
-  int b_chamber_;
+  long b_region_;
+  long b_chamber_;
 
   // NOTE window
   bool  b_win_digi_image_[180]; // [layer][ieta 3][strip 10] --> 6 * 3 * 10
   bool  b_win_digi_image_label_[180]; // actually SimTrack with abs(PID) == 6
-  int   b_win_strip_;
-  int   b_win_ieta_;
+  long   b_win_strip_;
+  long   b_win_ieta_;
 
   //////////////////////////////////////////////////////////////////////////////
   // NOTE histograms for summary & monitoring
