@@ -55,20 +55,14 @@ class GE0SegmentAnalyser : public edm::EDAnalyzer {
   long get3DImageIndexWindow(long layer, long roll, long strip);
   
   bool isSimTrackGood(edm::SimTrackContainer::const_iterator);
-
   bool isSimHitGood(edm::PSimHitContainer::const_iterator);
-
-  bool matchWithRecHit(const int, const GEMRecHit&);
-
-  tuple<bool, uint32_t, bool> isSimSegmentGood(
-      const vector<edm::PSimHitContainer::const_iterator> &);
-
+  tuple<bool, uint32_t, bool> areSimSegmentHitsGood(const vector<edm::PSimHitContainer::const_iterator> &);
   GE0SimSegmentCollection reconstructSimSegment(
       const edm::Handle<edm::SimTrackContainer>&,
       const edm::Handle<edm::PSimHitContainer>&,
       const edm::Handle<edm::DetSetVector<GEMDigiSimLink> >&,
       const edm::ESHandle<GEMGeometry>&);
-
+  bool matchWithRecHit(const int, const GEMRecHit&);
   bool associateRecSegToSimSeg(
       const GEMSegmentCollection::const_iterator&,
       const GE0SimSegment*,
@@ -109,6 +103,7 @@ class GE0SegmentAnalyser : public edm::EDAnalyzer {
   std::vector<long> b_digi_layer_; // for 
   std::vector<long> b_digi_ieta_;
   std::vector<long> b_digi_strip_;
+  std::vector<long> b_digi_bx_;
   std::vector<long> b_digi_label_;
   std::vector<long> b_digi_particle_type_;
   std::vector<long> b_digi_track_id_;
@@ -136,15 +131,16 @@ class GE0SegmentAnalyser : public edm::EDAnalyzer {
   std::vector<long> b_ru_muon_idx_;
   std::vector<float> b_ru_norm_chi2_; // normalized chi2
   std::vector<long> b_ru_rechit_size_;
-  std::vector<std::vector<long> > b_ru_rechit_layer_;
-  std::vector<std::vector<long> > b_ru_rechit_ieta_;
-  std::vector<std::vector<long> > b_ru_rechit_strip_;
-  std::vector<std::vector<long> > b_ru_rechit_first_strip_;
-  std::vector<std::vector<long> > b_ru_rechit_cls_;
-  std::vector<std::vector<long> > b_ru_rechit_bx_;
+  std::vector<std::vector<int> > b_ru_rechit_layer_;
+  std::vector<std::vector<int> > b_ru_rechit_ieta_;
+  std::vector<std::vector<int> > b_ru_rechit_strip_;
+  std::vector<std::vector<int> > b_ru_rechit_first_strip_;
+  std::vector<std::vector<int> > b_ru_rechit_cls_;
+  std::vector<std::vector<int> > b_ru_rechit_bx_;
 
   // additional
   long b_region_;
+  long b_station_;
   long b_chamber_;
 
   // NOTE window

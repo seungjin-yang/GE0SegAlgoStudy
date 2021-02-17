@@ -97,7 +97,6 @@ void GE0SegmentAnalyser::beginFileService() {
   tree_->Branch("rechit_strip", "vector<long>", &b_rechit_strip_);
   tree_->Branch("rechit_first_strip", "vector<long>", &b_rechit_first_strip_);
   tree_->Branch("rechit_cls", "vector<long>", &b_rechit_cls_);
-  tree_->Branch("rechit_bx", "vector<long>", &b_rechit_bx_);
   tree_->Branch("rechit_x", "vector<float>", &b_rechit_x_);
   tree_->Branch("rechit_y", "vector<float>", &b_rechit_y_);
   tree_->Branch("rechit_z", "vector<float>", &b_rechit_z_);
@@ -113,10 +112,10 @@ void GE0SegmentAnalyser::beginFileService() {
   tree_->Branch("ru_rechit_strip", &b_ru_rechit_strip_);
   tree_->Branch("ru_rechit_first_strip", &b_ru_rechit_first_strip_);
   tree_->Branch("ru_rechit_cls", &b_ru_rechit_cls_);
-  tree_->Branch("ru_rechit_bx", &b_ru_rechit_bx_);
 
   // additional position information
   tree_->Branch("region", &b_region_, "region/L");
+  tree_->Branch("station", &b_station_, "station/L");
   tree_->Branch("chamber", &b_chamber_, "chamber/L");
 
   //////////////////////////////////////////////////////////////////////////////
@@ -134,6 +133,7 @@ void GE0SegmentAnalyser::beginFileService() {
   tree_win_->Branch("muon_phi", &b_muon_phi_, "muon_phi/F");
 
   tree_win_->Branch("region", &b_region_, "region/L");
+  tree_win_->Branch("station", &b_station_, "station/L");
   tree_win_->Branch("chamber", &b_chamber_, "chamber/L");
 
   tree_win_->Branch("digi_image", &b_win_digi_image_, "digi_image[180]/O");
@@ -169,7 +169,6 @@ void GE0SegmentAnalyser::resetBranch() {
   b_rechit_strip_.clear();
   b_rechit_first_strip_.clear();
   b_rechit_cls_.clear();
-  b_rechit_bx_.clear();
   b_rechit_x_.clear();
   b_rechit_y_.clear();
   b_rechit_z_.clear();
@@ -185,9 +184,9 @@ void GE0SegmentAnalyser::resetBranch() {
   b_ru_rechit_strip_.clear();
   b_ru_rechit_first_strip_.clear();
   b_ru_rechit_cls_.clear();
-  b_ru_rechit_bx_.clear();
 
   b_region_ = -100L;
+  b_station_ = -100L;
   b_chamber_ = -100L;
 
   // NOTE tree_window_
@@ -219,31 +218,33 @@ bool GE0SegmentAnalyser::isSimTrackGood(
 
 bool GE0SegmentAnalyser::isSimHitGood(edm::PSimHitContainer::const_iterator sim_hit) {
   if (abs(sim_hit->particleType()) != 13) return false;
+  if (sim_hit->processType() != 0) return false;
 
   const EncodedEventId & event_id = sim_hit->eventId();
   if (event_id.event() != 0) return false;
   if (event_id.bunchCrossing() != 0) return false;
 
-  if (sim_hit->processType() != 0) return false;
+  const GEMDetId gem_id{sim_hit->detUnitId()};
+  if (gem_id.station() != 0) return false;
 
   return true;
 }
 
 // FIXME rename
-std::tuple<bool, uint32_t, bool> GE0SegmentAnalyser::isSimSegmentGood(
-    const vector<edm::PSimHitContainer::const_iterator> & sim_segment) {
+std::tuple<bool, uint32_t, bool> GE0SegmentAnalyser::areSimSegmentHitsGood(
+    const vector<edm::PSimHitContainer::const_iterator> & sim_segment_hits) {
   bool is_good = false;
   uint32_t primary_superchamber = 0; // FIXME
   bool need_to_prune = false;
  
-  if (sim_segment.size() < min_num_layers_) {
+  if (sim_segment_hits.size() < min_num_layers_) {
     return std::make_tuple(is_good, primary_superchamber, need_to_prune);
   }
 
   // <superchamber_rawid, layer>
   map<uint32_t, std::set<int> > layers_per_superchamber;
 
-  for (const auto & hit : sim_segment) {
+  for (const auto & hit : sim_segment_hits) {
     const GEMDetId gem_id{hit->detUnitId()};
     layers_per_superchamber[gem_id.superChamberId().rawId()].insert(gem_id.layer());
   }
@@ -300,7 +301,7 @@ GE0SimSegmentCollection GE0SegmentAnalyser::reconstructSimSegment(
       sim_segment_hits.push_back(sim_hit);
     } // PSimHitContainer
 
-    auto [is_sim_seg_good, primary_superchamber, need_to_prune] = isSimSegmentGood(sim_segment_hits);
+    auto [is_sim_seg_good, primary_superchamber, need_to_prune] = areSimSegmentHitsGood(sim_segment_hits);
     if (not is_sim_seg_good) {
       continue;
     }
@@ -431,6 +432,7 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
     edm::LogError(kLogCategory_) << "invalid GEMGeometry" << endl;
   }
 
+  //
   const GE0SimSegmentCollection&& sim_segment_collection = reconstructSimSegment(
       sim_track_container, sim_hit_container, link_set_vector, gem);
 
@@ -438,8 +440,7 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
     if (station->station() != 0) {
       continue;
     }
-
-    for (const GEMSuperChamber* superchamber : gem->superChambers()) {
+    for (const GEMSuperChamber* superchamber : station->superChambers()) {
       const GEMDetId & superchamber_id = superchamber->id();
 
       // NOTE SimSegment
@@ -462,17 +463,18 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
              });
       }
 
-      // NOTE
       resetBranch();
 
       b_region_ = static_cast<long>(superchamber_id.region());
+      b_station_ = static_cast<long>(superchamber_id.station());
       b_chamber_ = static_cast<long>(superchamber_id.chamber());
       b_muon_size_ = static_cast<long>(gemini_sim_segment_collection.size());
 
       // for labeling
       // map<tuple<layer, ieta, strip>, digi_idx>
-      map<tuple<int, int, int>, unsigned int> digi_det2idx;
+      map<tuple<int, int, int>, unsigned int> digi2idx;
 
+      // Fill digis and rechits
       for (const GEMChamber* chamber : superchamber->chambers()) {
         for (const GEMEtaPartition* eta_partition : chamber->etaPartitions()) {
           const GEMDetId & gem_id = eta_partition->id();
@@ -482,13 +484,20 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
           // NOTE GEMDigi
           auto digi_range = digi_collection->get(gem_id);
           for (auto digi = digi_range.first; digi != digi_range.second; ++digi) {
+            if (not digi->isValid()) {
+              edm::LogError(kLogCategory_) << "got an invalid digi" << std::endl;
+              continue;
+            }
             const long strip = static_cast<long>(digi->strip());
 
-            b_digi_layer_.push_back(layer);
-            b_digi_ieta_.push_back(ieta);
-            b_digi_strip_.push_back(strip);
+            tuple<int, int, int> key(layer, ieta, strip);
+            if (digi2idx.find(key) == digi2idx.end()) {
+              digi2idx.insert({key, b_digi_layer_.size()});
 
-            digi_det2idx.insert({{layer, ieta, strip}, b_digi_layer_.size()});
+              b_digi_layer_.push_back(layer);
+              b_digi_ieta_.push_back(ieta);
+              b_digi_strip_.push_back(strip);
+            }
           } // digi
 
           // NOTE GEMRecHit
@@ -509,7 +518,6 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
             b_rechit_strip_.push_back(strip);
             b_rechit_first_strip_.push_back(static_cast<long>(rechit->firstClusterStrip()));
             b_rechit_cls_.push_back(static_cast<long>(rechit->clusterSize()));
-            b_rechit_bx_.push_back(static_cast<long>(rechit->BunchX()));
 
             b_rechit_x_.push_back(superchamber_pos.x());
             b_rechit_y_.push_back(superchamber_pos.y());
@@ -518,9 +526,8 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
         } // eta partition
       } // layer
 
-      //////////////////////////////////////////////////////////////////////////
+
       //
-      //////////////////////////////////////////////////////////////////////////
       if (b_digi_layer_.size() < min_digis_) continue;
       b_digi_size_ = static_cast<long>(b_digi_layer_.size());
       b_rechit_size_ = static_cast<long>(b_rechit_layer_.size());
@@ -532,20 +539,28 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
       b_digi_particle_type_.resize(b_digi_size_, 0L);
       b_digi_track_id_.resize(b_digi_size_, 0L);
 
-      const auto link_set = link_set_vector->find(superchamber_id);
-      for (auto link = link_set->begin(); link != link_set->end(); link++) {
-        const GEMDetId id{link->getDetUnitId()};
-        const std::tuple<int, int, int> det{id.layer(), id.roll(), link->getStrip()};
-        const unsigned int index = digi_det2idx[det];
-        b_digi_particle_type_[index] = link->getParticleType();
-        b_digi_track_id_[index] = link->getTrackId();
-      }
+      for (const GEMChamber* chamber : superchamber->chambers()) {
+        for (const GEMEtaPartition* eta_partition : chamber->etaPartitions()) {
+          const auto link_set = link_set_vector->find(eta_partition->id());
+          if (not link_set->empty()) {
+            continue;
+          }
 
+          for (auto link = link_set->begin(); link != link_set->end(); link++) {
+            const GEMDetId id{link->getDetUnitId()};
+            const std::tuple<int, int, int> det{id.layer(), id.roll(), link->getStrip()};
+            const unsigned int index = digi2idx[det];
+            b_digi_particle_type_[index] = link->getParticleType();
+            b_digi_track_id_[index] = link->getTrackId();
+          }
+        }
+      }
 
       //////////////////////////////////////////////////////////////////////////
       // Put labels on digis and fill muon informations using GE0SimSegment
       //////////////////////////////////////////////////////////////////////////
       b_digi_label_.resize(b_digi_size_, 0L);
+
       for (unsigned int idx = 0; idx < gemini_sim_segment_collection.size(); idx++) {
         auto sim_segment = gemini_sim_segment_collection[idx];
         const long particle_type = static_cast<long>(sim_segment->type());
@@ -559,7 +574,8 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
         const long label = static_cast<long>(idx) + 1L;
         for (const auto& [id, digi] : sim_segment->digis()) {
           const std::tuple<int, int, int> det{id.layer(), id.roll(), digi.strip()};
-          const unsigned int index = digi_det2idx[det];
+          // FIXME check if digi2idx has det as a key.
+          const unsigned int index = digi2idx[det];
           b_digi_label_[index] = label;
           b_digi_particle_type_[index] = particle_type;
           b_digi_track_id_[index] = track_id;
@@ -572,15 +588,15 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
       b_rechit_label_.resize(b_rechit_size_, 0L);
 
       for (unsigned int rechit_index = 0; rechit_index < b_rechit_layer_.size(); rechit_index++) {
-        const long layer = b_rechit_layer_[rechit_index];
-        const long ieta = b_rechit_ieta_[rechit_index];
-        const long first_strip = b_rechit_first_strip_[rechit_index];
-        const long last_strip = first_strip + b_rechit_cls_[rechit_index];
+        const int layer = static_cast<int>(b_rechit_layer_[rechit_index]);
+        const int ieta = static_cast<int>(b_rechit_ieta_[rechit_index]);
+        const int first_strip = static_cast<int>(b_rechit_first_strip_[rechit_index]);
+        const int last_strip = first_strip + static_cast<int>(b_rechit_cls_[rechit_index]);
 
-        std::set<long> label_set;
-        for (long strip = first_strip; strip <= last_strip; strip++) {
+        std::set<int> label_set;
+        for (int strip = first_strip; strip <= last_strip; strip++) {
           const std::tuple<int, int, int> key(layer, ieta, strip);
-          const unsigned int digi_index = digi_det2idx[key];
+          const unsigned int digi_index = digi2idx[key];
           const long digi_label = b_digi_label_[digi_index];
           if (digi_label != 0) {
             label_set.insert(digi_label);
@@ -591,10 +607,12 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
           b_rechit_label_[rechit_index] = (*label_set.begin());
 
         } else {
+          // In the case of ambiguity, put 0 label on the rechit.
           b_rechit_label_[rechit_index] = 0;
 
         }
       } // rechit
+
 
       //////////////////////////////////////////////////////////////////////////
       // NOTE RU
@@ -610,7 +628,6 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
       b_ru_rechit_strip_.reserve(b_ru_size_);
       b_ru_rechit_first_strip_.reserve(b_ru_size_);
       b_ru_rechit_cls_.reserve(b_ru_size_);
-      b_ru_rechit_bx_.reserve(b_ru_size_);
 
       for (auto rec_segment = rec_seg_range.first; rec_segment != rec_seg_range.second; rec_segment++) {
         const long ru_rechit_size = static_cast<long>(rec_segment->nRecHits());
@@ -630,30 +647,27 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
         }
         b_ru_muon_idx_.push_back(asso_muon_idx);
 
-        std::vector<long> rechit_layer;
-        std::vector<long> rechit_ieta;
-        std::vector<long> rechit_strip;
-        std::vector<long> rechit_first_strip;
-        std::vector<long> rechit_cls;
-        std::vector<long> rechit_bx;
+        std::vector<int> rechit_layer;
+        std::vector<int> rechit_ieta;
+        std::vector<int> rechit_strip;
+        std::vector<int> rechit_first_strip;
+        std::vector<int> rechit_cls;
         rechit_layer.reserve(ru_rechit_size);
         rechit_ieta.reserve(ru_rechit_size);
         rechit_strip.reserve(ru_rechit_size);
         rechit_first_strip.reserve(ru_rechit_size);
         rechit_cls.reserve(ru_rechit_size);
-        rechit_bx.reserve(ru_rechit_size);
 
         for (const auto &  rechit : rec_segment->specificRecHits()) {
           const auto&& gem_id = rechit.gemId();
           auto eta_partition = gem->etaPartition(gem_id);
-          const long strip = static_cast<long>(eta_partition->strip(rechit.localPosition()));
+          const int strip = static_cast<int>(eta_partition->strip(rechit.localPosition()));
 
           rechit_layer.push_back(gem_id.layer());
           rechit_ieta.push_back(gem_id.layer());
           rechit_strip.push_back(strip);
-          rechit_first_strip.push_back(static_cast<long>(rechit.firstClusterStrip()));
-          rechit_cls.push_back(static_cast<long>(rechit.clusterSize()));
-          rechit_bx.push_back(static_cast<long>(rechit.BunchX()));
+          rechit_first_strip.push_back(rechit.firstClusterStrip());
+          rechit_cls.push_back(rechit.clusterSize());
         }
 
         b_ru_rechit_layer_.push_back(rechit_layer);
@@ -661,7 +675,6 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
         b_ru_rechit_strip_.push_back(rechit_strip);
         b_ru_rechit_first_strip_.push_back(rechit_first_strip);
         b_ru_rechit_cls_.push_back(rechit_cls);
-        b_ru_rechit_bx_.push_back(rechit_bx);
       } // rec segment
 
       tree_->Fill();
@@ -669,8 +682,7 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
       //////////////////////////////////////////////////////////////////////////
       // window algorithm
       //////////////////////////////////////////////////////////////////////////
-
-      if (gemini_sim_segment_collection.size() <= 1) {
+      if (b_muon_size_ <= 1) {
         // scaning for windows
         // finding the one with most hits in 3 strip window
         int max_ieta = 0;
@@ -682,8 +694,8 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
             int current_nhits=0;
             for (int win_nstrip = -1; win_nstrip < 2; ++win_nstrip) {
               for (int nlayer = 1; nlayer <= 6; ++nlayer) {            
-                const std::tuple<int, int, int> key(nlayer, ieta, nstrip+win_nstrip);
-                if (digi_det2idx.find(key) != digi_det2idx.end()) {
+                const std::tuple<int, int, int> key(nlayer, ieta, nstrip + win_nstrip);
+                if (digi2idx.find(key) != digi2idx.end()) {
                   current_nhits++;
                 }
               }
@@ -697,36 +709,39 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
           } // strip
         } // eta partition
 
-        if (max_hits > 0) {
-          // found max strip window center
-          // saving window
-          for (int win_ieta = 1; win_ieta < 4; ++win_ieta) {
-            for (int win_nstrip = 1; win_nstrip < 11; ++win_nstrip) {
-              for (int win_nlayer = 1; win_nlayer < 7; ++win_nlayer) {
-                const int test_ieta = max_ieta + win_ieta -1;
-                const int test_nstrip = max_nstrip + win_nstrip - 5;
-                const int index_win = get3DImageIndexWindow(win_nlayer, win_ieta, win_nstrip);
-                bool has_hit = false;
-                bool has_muon_hit = false;
-                // for padding
-                if ((test_ieta > 0 and test_ieta < 9) and (test_nstrip > 0 and test_nstrip < 385) ) {
-                  const std::tuple<int, int, int> key(win_nlayer, test_ieta, test_nstrip);
-                  has_hit = digi_det2idx.find(key) != digi_det2idx.end();
-                  has_muon_hit = has_hit ? b_digi_label_[digi_det2idx[key]] > 0 : false;
-                }
+        if (max_hits < 1) {
+          continue;
+        }
 
-                b_win_digi_image_[index_win] = has_hit;
-                b_win_digi_image_label_[index_win] = has_muon_hit;
+        // found max strip window center
+        // saving window
+        for (int win_ieta = 1; win_ieta < 4; ++win_ieta) {
+          for (int win_nstrip = 1; win_nstrip < 11; ++win_nstrip) {
+            for (int win_nlayer = 1; win_nlayer < 7; ++win_nlayer) {
+              const int test_ieta = max_ieta + win_ieta -1;
+              const int test_nstrip = max_nstrip + win_nstrip - 5;
+              const int index_win = get3DImageIndexWindow(win_nlayer, win_ieta, win_nstrip);
+              bool has_hit = false;
+              bool has_muon_hit = false;
+              // for padding
+              if ((test_ieta > 0 and test_ieta < 9) and (test_nstrip > 0 and test_nstrip < 385) ) {
+                const std::tuple<int, int, int> key(win_nlayer, test_ieta, test_nstrip);
+                has_hit = digi2idx.find(key) != digi2idx.end();
+                has_muon_hit = has_hit ? b_digi_label_[digi2idx[key]] > 0 : false;
+              }
 
-              } //layer
-            } // strip
-          } // ieta
+              b_win_digi_image_[index_win] = has_hit;
+              b_win_digi_image_label_[index_win] = has_muon_hit;
 
-          b_win_strip_ = max_nstrip;
-          b_win_ieta_ = max_ieta;
-          tree_win_->Fill();
-        } // if (max_hits > 0)
+            } //layer
+          } // strip
+        } // ieta
+
+        b_win_strip_ = max_nstrip;
+        b_win_ieta_ = max_ieta;
+        tree_win_->Fill();
       } // b_num <= 1, window algorithm
+
 
     } // chamber loop
   } // station
