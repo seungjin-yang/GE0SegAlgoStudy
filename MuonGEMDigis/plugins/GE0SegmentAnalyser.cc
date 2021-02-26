@@ -368,9 +368,16 @@ bool GE0SegmentAnalyser::associateRecSegToSimSeg(
   for (const auto & rechit : rec_segment->specificRecHits()) {
     const GEMDetId rechit_id = rechit.gemId();
     found_layer.insert(rechit_id.layer());
+  }
 
-    for (const auto & [digi_id, digi] : sim_segment->digis()) {
-      if (rechit_id != digi_id) continue;
+  for (const auto & [digi_id, digi] : sim_segment->digis()) {
+    for (const auto & rechit : rec_segment->specificRecHits()) {
+      const GEMDetId rechit_id = rechit.gemId();
+
+      if (rechit_id != digi_id) {
+        continue;
+      }
+
       if (matchWithRecHit(digi.strip(), rechit)) {
         num_matched++;
         break;
