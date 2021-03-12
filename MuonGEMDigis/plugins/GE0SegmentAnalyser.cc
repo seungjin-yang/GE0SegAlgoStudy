@@ -80,6 +80,7 @@ void GE0SegmentAnalyser::beginFileService() {
   tree_->Branch("digi_layer", "vector<long>", &b_digi_layer_);
   tree_->Branch("digi_ieta", "vector<long>", &b_digi_ieta_);
   tree_->Branch("digi_strip", "vector<long>", &b_digi_strip_);
+  tree_->Branch("digi_bx", "vector<long>", &b_digi_bx_);
   tree_->Branch("digi_label", "vector<long>", &b_digi_label_);
   tree_->Branch("digi_particle_type", "vector<long>", &b_digi_particle_type_);
   tree_->Branch("digi_track_id", "vector<long>", &b_digi_track_id_);
@@ -89,6 +90,7 @@ void GE0SegmentAnalyser::beginFileService() {
   tree_->Branch("muon_pt", "vector<float>", &b_muon_pt_);
   tree_->Branch("muon_eta", "vector<float>", &b_muon_eta_);
   tree_->Branch("muon_phi", "vector<float>", &b_muon_phi_);
+  tree_->Branch("muon_charge", "vector<long>", &b_muon_charge_);
 
   // rechit
   tree_->Branch("rechit_size", &b_rechit_size_, "rechit_size/L");
@@ -105,6 +107,10 @@ void GE0SegmentAnalyser::beginFileService() {
   // Road Usage Segment
   tree_->Branch("ru_size", &b_ru_size_, "ru_size/L");
   tree_->Branch("ru_muon_idx", "vector<long>", &b_ru_muon_idx_);
+  tree_->Branch("ru_num_matched", "vector<long>", &b_ru_num_matched_);
+  tree_->Branch("ru_eff", "vector<float>", &b_ru_eff_);
+  tree_->Branch("ru_fake_hit_rate", "vector<float>", &b_ru_fake_hit_rate_);
+  tree_->Branch("ru_fake_digi_rate", "vector<float>", &b_ru_fake_digi_rate_);
   tree_->Branch("ru_norm_chi2", "vector<float>", &b_ru_norm_chi2_);
   tree_->Branch("ru_rechit_size", "vector<long>", &b_ru_rechit_size_);
   tree_->Branch("ru_rechit_layer", &b_ru_rechit_layer_);
@@ -112,6 +118,7 @@ void GE0SegmentAnalyser::beginFileService() {
   tree_->Branch("ru_rechit_strip", &b_ru_rechit_strip_);
   tree_->Branch("ru_rechit_first_strip", &b_ru_rechit_first_strip_);
   tree_->Branch("ru_rechit_cls", &b_ru_rechit_cls_);
+  tree_->Branch("ru_rechit_bx", &b_ru_rechit_bx_);
 
   // additional position information
   tree_->Branch("region", &b_region_, "region/L");
@@ -126,11 +133,13 @@ void GE0SegmentAnalyser::beginFileService() {
   tree_win_->Branch("digi_layer", "vector<long>", &b_digi_layer_);
   tree_win_->Branch("digi_ieta", "vector<long>", &b_digi_ieta_);
   tree_win_->Branch("digi_strip", "vector<long>", &b_digi_strip_);
+  tree_win_->Branch("digi_bx", "vector<long>", &b_digi_bx_);
   tree_win_->Branch("digi_label", "vector<long>", &b_digi_label_);
 
   tree_win_->Branch("muon_pt", &b_muon_pt_, "muon_pt/F");
   tree_win_->Branch("muon_eta", &b_muon_eta_, "muon_eta/F");
   tree_win_->Branch("muon_phi", &b_muon_phi_, "muon_phi/F");
+  tree_win_->Branch("muon_charge", &b_muon_charge_, "muon_charge/F");
 
   tree_win_->Branch("region", &b_region_, "region/L");
   tree_win_->Branch("station", &b_station_, "station/L");
@@ -152,6 +161,7 @@ void GE0SegmentAnalyser::resetBranch() {
   b_digi_layer_.clear();
   b_digi_ieta_.clear();
   b_digi_strip_.clear();
+  b_digi_bx_.clear();
   b_digi_label_.clear();
   b_digi_particle_type_.clear();
   b_digi_track_id_.clear();
@@ -161,6 +171,7 @@ void GE0SegmentAnalyser::resetBranch() {
   b_muon_pt_.clear();
   b_muon_eta_.clear();
   b_muon_phi_.clear();
+  b_muon_charge_.clear();
 
   // RecHit
   b_rechit_size_ = -1L;
@@ -177,6 +188,10 @@ void GE0SegmentAnalyser::resetBranch() {
   // Road Usage
   b_ru_size_ = -1L;
   b_ru_muon_idx_.clear();
+  b_ru_num_matched_.clear();
+  b_ru_eff_.clear();
+  b_ru_fake_hit_rate_.clear();
+  b_ru_fake_digi_rate_.clear();
   b_ru_norm_chi2_.clear();
   b_ru_rechit_size_.clear();
   b_ru_rechit_layer_.clear();
@@ -184,6 +199,7 @@ void GE0SegmentAnalyser::resetBranch() {
   b_ru_rechit_strip_.clear();
   b_ru_rechit_first_strip_.clear();
   b_ru_rechit_cls_.clear();
+  b_ru_rechit_bx_.clear();
 
   b_region_ = -100L;
   b_station_ = -100L;
@@ -357,37 +373,116 @@ GE0SimSegmentCollection GE0SegmentAnalyser::reconstructSimSegment(
   return sim_segment_collection;
 }
 
-bool GE0SegmentAnalyser::associateRecSegToSimSeg(
+std::pair<float, unsigned int> GE0SegmentAnalyser::computeEfficiency(
     const GEMSegmentCollection::const_iterator& rec_segment,
-    const GE0SimSegment* sim_segment,
-    const edm::ESHandle<GEMGeometry>& gem) { // FIXME GEMGeometry to Handle
+    const GE0SimSegment* sim_segment) {
 
-  int num_matched = 0; 
-  std::set<int> found_layer;
+  const std::vector<GEMRecHit>& rechit_collection = rec_segment->specificRecHits();
+  // digi means the digitized simhits
+  const std::vector<GE0SimSegment::DigiData>&& muon_digi_collection = sim_segment->digis();
 
-  for (const auto & rechit : rec_segment->specificRecHits()) {
-    const GEMDetId rechit_id = rechit.gemId();
-    found_layer.insert(rechit_id.layer());
-  }
+  // Compute the segment-wise efficiency.
+  // Efficiency = (# of matched simhits) / (# of simhits)
+  unsigned int num_matched = 0;
 
-  for (const auto & [digi_id, digi] : sim_segment->digis()) {
-    for (const auto & rechit : rec_segment->specificRecHits()) {
-      const GEMDetId rechit_id = rechit.gemId();
+  for (const auto & [digi_id, digi] : muon_digi_collection) {
+    const int digi_strip = static_cast<int>(digi.strip()); // from uint16_t to int
+    const int digi_bx = static_cast<int>(digi.bx()); // from int16_t to int
 
-      if (rechit_id != digi_id) {
+    for (const GEMRecHit& rechit : rechit_collection) {
+      if (digi_bx != rechit.BunchX()) {
         continue;
       }
 
-      if (matchWithRecHit(digi.strip(), rechit)) {
+      if (matchWithRecHit(digi_strip, rechit)) {
         num_matched++;
         break;
       }
-    }
-  }
+    } // rechit
+  } // digi
 
-  // NOTE quality of RecSegment
-  const double quality = static_cast<double>(num_matched) / sim_segment->simHits().size();
-  return (found_layer.size() >= min_num_layers_) and (quality >= min_quality_);
+  const float efficiency = static_cast<float>(num_matched) / muon_digi_collection.size();
+  return std::make_pair(efficiency, num_matched);
+}
+
+
+float GE0SegmentAnalyser::computeFakeHitRate(
+    const GEMSegmentCollection::const_iterator& rec_segment,
+    const GE0SimSegment* sim_segment) {
+
+  const std::vector<GEMRecHit>& rechit_collection = rec_segment->specificRecHits();
+  // digi means the digitized simhits
+  const std::vector<GE0SimSegment::DigiData>&& muon_digi_collection = sim_segment->digis();
+
+  const int num_total = rec_segment->nRecHits();
+  int num_fake = 0;
+
+  for (const auto & rechit : rechit_collection) {
+    const GEMDetId rechit_id = rechit.gemId();
+    const int rechit_bx = rechit.BunchX();
+
+    bool is_not_matched = true;
+    for (const auto & [digi_id, digi] : muon_digi_collection) {
+      if (rechit_id != digi_id) continue;
+      if (rechit_bx != digi.bx()) continue;
+
+      if (is_not_matched) {
+        if (matchWithRecHit(digi.strip(), rechit)) {
+          is_not_matched = false;
+          break;
+        }
+      }
+    } // digi
+
+    if (is_not_matched) {
+      num_fake++;
+    }
+  } // rechit
+
+  // return fake rate
+  return static_cast<float>(num_fake) / num_total;
+}
+
+float GE0SegmentAnalyser::computeFakeDigiRate(
+    const GEMSegmentCollection::const_iterator& rec_segment,
+    const GE0SimSegment* sim_segment) {
+
+  const std::vector<GEMRecHit>& rechit_collection = rec_segment->specificRecHits();
+  // digi means the digitized simhits
+  const std::vector<GE0SimSegment::DigiData>&& muon_digi_collection = sim_segment->digis();
+
+  int num_fake = 0;
+  int num_total = 0;
+
+  for (const auto & rechit : rechit_collection) {
+    const GEMDetId rechit_id = rechit.gemId();
+    const int rechit_bx = rechit.BunchX();
+    const int cluster_size = rechit.firstClusterStrip();
+
+    num_total += cluster_size;
+
+    // decluster a rechit into strips for comparison with L1 trigger
+    const int first_strip = rechit.firstClusterStrip();
+    const int last_strip = first_strip + cluster_size - 1;
+    for (int strip = first_strip; strip <= last_strip; strip++) {
+
+      bool is_not_strip_matched = true;
+      for (const auto & [digi_id, digi] : muon_digi_collection) {
+        if (strip != digi.strip()) continue;
+        if (rechit_bx != digi.bx()) continue;
+        if (rechit_id != digi_id) continue;
+
+        is_not_strip_matched = false;
+        break;
+      } // digi
+
+      if (is_not_strip_matched) {
+        num_fake++;
+      }
+    } // strip
+  } // rechit
+
+  return static_cast<float>(num_fake) / num_total;
 }
 
 void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup& event_setup) {
@@ -496,6 +591,7 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
               continue;
             }
             const long strip = static_cast<long>(digi->strip());
+            const long bx = static_cast<long>(digi->bx());
 
             tuple<int, int, int> key(layer, ieta, strip);
             if (digi2idx.find(key) == digi2idx.end()) {
@@ -504,6 +600,7 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
               b_digi_layer_.push_back(layer);
               b_digi_ieta_.push_back(ieta);
               b_digi_strip_.push_back(strip);
+              b_digi_bx_.push_back(bx);
             }
           } // digi
 
@@ -573,11 +670,8 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
         const long particle_type = static_cast<long>(sim_segment->type());
         const long track_id = static_cast<long>(sim_segment->trackId());
 
-        b_muon_pt_.push_back(sim_segment->pt());
-        b_muon_eta_.push_back(sim_segment->eta());
-        b_muon_phi_.push_back(sim_segment->phi());
-
         // TODO documentation
+        // label 0 means strips fired by background hits or noise
         const long label = static_cast<long>(idx) + 1L;
         for (const auto& [id, digi] : sim_segment->digis()) {
           const std::tuple<int, int, int> det{id.layer(), id.roll(), digi.strip()};
@@ -587,6 +681,12 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
           b_digi_particle_type_[index] = particle_type;
           b_digi_track_id_[index] = track_id;
         }
+
+        // TODO dphi, dstrip, nlayers,
+        b_muon_pt_.push_back(sim_segment->pt());
+        b_muon_eta_.push_back(sim_segment->eta());
+        b_muon_phi_.push_back(sim_segment->phi());
+        b_muon_charge_.push_back(static_cast<long>(sim_segment->charge()));
       } // GE0SimSegment
 
       //////////////////////////////////////////////////////////////////////////
@@ -620,7 +720,6 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
         }
       } // rechit
 
-
       //////////////////////////////////////////////////////////////////////////
       // NOTE RU
       //////////////////////////////////////////////////////////////////////////
@@ -628,13 +727,19 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
       b_ru_size_ = std::distance(rec_seg_range.first, rec_seg_range.second);
 
       b_ru_muon_idx_.reserve(b_ru_size_);
+      b_ru_num_matched_.reserve(b_ru_size_);
+      b_ru_eff_.reserve(b_ru_size_);
+      b_ru_fake_hit_rate_.reserve(b_ru_size_);
+      b_ru_fake_digi_rate_.reserve(b_ru_size_);
       b_ru_norm_chi2_.reserve(b_ru_size_);
-      b_ru_muon_idx_.reserve(b_ru_size_);
+      b_ru_rechit_size_.reserve(b_ru_size_);
+
       b_ru_rechit_layer_.reserve(b_ru_size_);
       b_ru_rechit_ieta_.reserve(b_ru_size_);
       b_ru_rechit_strip_.reserve(b_ru_size_);
       b_ru_rechit_first_strip_.reserve(b_ru_size_);
       b_ru_rechit_cls_.reserve(b_ru_size_);
+      b_ru_rechit_bx_.reserve(b_ru_size_);
 
       for (auto rec_segment = rec_seg_range.first; rec_segment != rec_seg_range.second; rec_segment++) {
         const long ru_rechit_size = static_cast<long>(rec_segment->nRecHits());
@@ -645,25 +750,40 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
 
         // the index of an associated muon (GE0SimSegment)
         long asso_muon_idx = -1;
+        long num_matched = -1;
+        float efficiency = 0.0f;
+        float fake_hit_rate = 1.0f;
+        float fake_digi_rate = 1.0f;
+
         for (unsigned int idx = 0; idx < gemini_sim_segment_collection.size(); idx++) {
           const GE0SimSegment* sim_segment = gemini_sim_segment_collection[idx];
-          if (associateRecSegToSimSeg(rec_segment, sim_segment, gem)) {
+          auto eff_result = computeEfficiency(rec_segment, sim_segment);
+          if (eff_result.second >= min_num_layers_) {
             asso_muon_idx = static_cast<long>(idx);
+            std::tie(efficiency, num_matched) = eff_result;
+            fake_hit_rate = computeFakeHitRate(rec_segment, sim_segment);
+            fake_digi_rate = computeFakeHitRate(rec_segment, sim_segment);
             break;
           }
         }
+
         b_ru_muon_idx_.push_back(asso_muon_idx);
+        b_ru_num_matched_.push_back(static_cast<long>(num_matched));
+        b_ru_eff_.push_back(efficiency);
+        b_ru_fake_hit_rate_.push_back(fake_hit_rate);
+        b_ru_fake_digi_rate_.push_back(fake_digi_rate);
 
         std::vector<int> rechit_layer;
         std::vector<int> rechit_ieta;
         std::vector<int> rechit_strip;
         std::vector<int> rechit_first_strip;
         std::vector<int> rechit_cls;
+        std::vector<int> rechit_bx;
         rechit_layer.reserve(ru_rechit_size);
         rechit_ieta.reserve(ru_rechit_size);
         rechit_strip.reserve(ru_rechit_size);
         rechit_first_strip.reserve(ru_rechit_size);
-        rechit_cls.reserve(ru_rechit_size);
+        rechit_bx.reserve(ru_rechit_size);
 
         for (const auto &  rechit : rec_segment->specificRecHits()) {
           const auto&& gem_id = rechit.gemId();
@@ -675,6 +795,7 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
           rechit_strip.push_back(strip);
           rechit_first_strip.push_back(rechit.firstClusterStrip());
           rechit_cls.push_back(rechit.clusterSize());
+          rechit_bx.push_back(rechit.BunchX());
         }
 
         b_ru_rechit_layer_.push_back(rechit_layer);
@@ -682,6 +803,7 @@ void GE0SegmentAnalyser::analyze(const edm::Event& event, const edm::EventSetup&
         b_ru_rechit_strip_.push_back(rechit_strip);
         b_ru_rechit_first_strip_.push_back(rechit_first_strip);
         b_ru_rechit_cls_.push_back(rechit_cls);
+        b_ru_rechit_bx_.push_back(rechit_bx);
       } // rec segment
 
       tree_->Fill();

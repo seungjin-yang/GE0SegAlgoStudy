@@ -63,10 +63,9 @@ class GE0SegmentAnalyser : public edm::EDAnalyzer {
       const edm::Handle<edm::DetSetVector<GEMDigiSimLink> >&,
       const edm::ESHandle<GEMGeometry>&);
   bool matchWithRecHit(const int, const GEMRecHit&);
-  bool associateRecSegToSimSeg(
-      const GEMSegmentCollection::const_iterator&,
-      const GE0SimSegment*,
-      const edm::ESHandle<GEMGeometry>&);
+  std::pair<float, unsigned int> computeEfficiency(const GEMSegmentCollection::const_iterator&, const GE0SimSegment*);
+  float computeFakeHitRate(const GEMSegmentCollection::const_iterator&, const GE0SimSegment*);
+  float computeFakeDigiRate(const GEMSegmentCollection::const_iterator&, const GE0SimSegment*);
 
 
   // ----------member data ---------------------------
@@ -95,7 +94,7 @@ class GE0SegmentAnalyser : public edm::EDAnalyzer {
 
   //////////////////////////////////////////////////////////////////////////////
   // NOTE Branches
-  // DL-aware branch
+  // CUDA-aware branch
   // features -> float
   // index or label -> long
   //////////////////////////////////////////////////////////////////////////////
@@ -112,6 +111,7 @@ class GE0SegmentAnalyser : public edm::EDAnalyzer {
   std::vector<float> b_muon_pt_;
   std::vector<float> b_muon_eta_;
   std::vector<float> b_muon_phi_;
+  std::vector<long> b_muon_charge_;
 
   long b_rechit_size_;
   std::vector<long> b_rechit_layer_;
@@ -129,6 +129,10 @@ class GE0SegmentAnalyser : public edm::EDAnalyzer {
   // https://github.com/cms-sw/cmssw/blob/CMSSW_10_6_1/RecoLocalMuon/GEMSegment/python/GEMSegmentsRU_cfi.py
   long b_ru_size_;
   std::vector<long> b_ru_muon_idx_;
+  std::vector<long> b_ru_num_matched_;
+  std::vector<float> b_ru_eff_;
+  std::vector<float> b_ru_fake_hit_rate_;
+  std::vector<float> b_ru_fake_digi_rate_;
   std::vector<float> b_ru_norm_chi2_; // normalized chi2
   std::vector<long> b_ru_rechit_size_;
   std::vector<std::vector<int> > b_ru_rechit_layer_;
@@ -148,6 +152,10 @@ class GE0SegmentAnalyser : public edm::EDAnalyzer {
   bool  b_win_digi_image_label_[180]; // actually SimTrack with abs(PID) == 6
   long   b_win_strip_;
   long   b_win_ieta_;
+
+  //
+
+
 
   //////////////////////////////////////////////////////////////////////////////
   // NOTE histograms for summary & monitoring
