@@ -26,18 +26,18 @@ class GE0SimSegment {
 
   ~GE0SimSegment() {}
 
-  Float_t pt(void) const {return sim_track_->momentum().Pt();}
-  Float_t eta(void) const {return sim_track_->momentum().Eta();}
-  Float_t phi(void) const {return sim_track_->momentum().Phi();}
-
   SimTrackData simTrack(void) const {return sim_track_;}
   GEMDetId detId() const {return det_id_;}
   std::vector<SimHitData> simHits(void) const {return simhits_;}
   std::vector<DigiData> digis(void) const {return digis_;}
 
   // helper
+  float pt(void) const {return sim_track_->momentum().Pt();}
+  float eta(void) const {return sim_track_->momentum().Eta();}
+  float phi(void) const {return sim_track_->momentum().Phi();}
+  float charge(void) const {return sim_track_->charge();} // charge is float!!!
   unsigned int trackId() const {return sim_track_->trackId();}
-  int type() const {return sim_track_->type();}
+  int type() const {return sim_track_->type();} // pid
 
  private:
   SimTrackData sim_track_;
