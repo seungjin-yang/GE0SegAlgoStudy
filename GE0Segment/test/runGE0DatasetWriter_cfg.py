@@ -17,7 +17,7 @@ process.load('Configuration.Geometry.GeometryExtended2026D76Reco_cff')
 process.load('Configuration.StandardSequences.MagneticField_cff')
 process.load('Configuration.StandardSequences.EndOfProcess_cff')
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
-process.load('MuonTriggering.GE0Segment.ge0SegmentAnalyser_cff')
+process.load('MuonTriggering.GE0Segment.ge0DatasetWriter_cff')
 
 process.maxEvents = cms.untracked.PSet(
     input = cms.untracked.int32(-1),
@@ -44,7 +44,7 @@ from Configuration.AlCa.GlobalTag import GlobalTag
 process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase2_realistic_T21', '')
 
 # Path and EndPath definitions
-process.GE0 = cms.Path(process.ge0SegmentAnalyser)
+process.GE0 = cms.Path(process.ge0DatasetWriter)
 
 # Schedule definition
 process.schedule = cms.Schedule(process.GE0)
