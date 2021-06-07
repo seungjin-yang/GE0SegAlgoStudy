@@ -160,11 +160,11 @@ void GE0DatasetWriter::beginFileService() {
 
 void GE0DatasetWriter::resetBranch() {
   // GEMSuperChamber
-  // b_region_ = -100L;
-  // b_station_ = -100L;
-  // b_chamber_ = -100L;
+  b_region_ = -100L;
+  b_station_ = -100L;
+  b_chamber_ = -100L;
   // SimTrack, muon 
-  // b_muon_size_ = -1L;
+  b_muon_size_ = -1L;
   b_muon_pt_.clear();
   b_muon_eta_.clear();
   b_muon_phi_.clear();
@@ -176,29 +176,32 @@ void GE0DatasetWriter::resetBranch() {
   b_muon_hit_layer_.clear();
   b_muon_hit_ieta_.clear();
   b_muon_hit_strip_.clear();
+  b_muon_bending_x_.clear();
+  b_muon_bending_y_.clear();
+  b_muon_bending_ieta_.clear();
+  b_muon_bending_strip_.clear();
   // GEMDigi
-  // b_digi_size_ = -1L;
-  // b_digi_layer_count_ = -1L;
+  b_digi_size_ = -1L;
+  b_digi_layer_count_ = -1L;
   b_digi_layer_.clear();
   b_digi_ieta_.clear();
   b_digi_strip_.clear();
-  // b_digi_bx_.clear();
   b_digi_label_.clear();
   // GEMPadDigi
-  // b_pad_size_ = -1L;
-  // b_pad_layer_count_ = -1L;
+  b_pad_size_ = -1L;
+  b_pad_layer_count_ = -1L;
   b_pad_layer_.clear();
   b_pad_ieta_.clear();
-  // b_pad_bx_.clear();
   b_pad_label_.clear();
   // GEMRecHit
-  // b_rechit_size_ = -1L;
-  // b_rechit_layer_count_ = -1L;
+  b_rechit_size_ = -1L;
+  b_rechit_layer_count_ = -1L;
   b_rechit_layer_.clear();
   b_rechit_ieta_.clear();
   b_rechit_strip_.clear();
   b_rechit_first_strip_.clear();
   b_rechit_cls_.clear();
+  b_rechit_bx_.clear();
   b_rechit_x_.clear();
   b_rechit_y_.clear();
   b_rechit_z_.clear();
@@ -207,10 +210,10 @@ void GE0DatasetWriter::resetBranch() {
   b_rechit_err_yy_.clear();
   b_rechit_label_.clear();
   // GEMSegment by Road Usage
-  // b_ru_size_ = -1L;
+  b_ru_size_ = -1L;
   b_ru_muon_idx_.clear();
-  b_ru_num_matched_.clear();
   b_ru_rechit_size_.clear();
+  b_ru_num_matched_.clear();
   b_ru_eff_.clear();
   b_ru_fake_hit_rate_.clear();
   b_ru_norm_chi2_.clear();
@@ -221,11 +224,11 @@ void GE0DatasetWriter::resetBranch() {
   b_ru_rechit_cls_.clear();
   b_ru_rechit_bx_.clear();
   // Window 
-  // b_has_window_ = false;
+  b_has_window_ = false;
   std::fill_n(b_window_image_, 180, false);
   std::fill_n(b_window_label_, 180, false);
-  // b_window_strip_ = 0L;
-  // b_window_ieta_ = 0L;
+  b_window_strip_ = -1L;
+  b_window_ieta_ = -1L;
 }
 
 long GE0DatasetWriter::get3DImageIndexWindow(long layer, long ieta, long strip) {
