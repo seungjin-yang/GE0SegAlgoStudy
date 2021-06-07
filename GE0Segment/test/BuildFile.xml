@@ -1,0 +1,8 @@
+<use name="Geometry/GEMGeometry"/>
+<use name="Geometry/GEMGeometryBuilder"/>
+<use name="Geometry/Records"/>
+<use name="FWCore/Framework"/>
+<use name="CommonTools/UtilAlgos"/>
+<flags EDM_PLUGIN="1"/>
+<library file="GE0GeometryDumper.cc" name="GE0GeometryDumper">
+</library>
