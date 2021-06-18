@@ -39,7 +39,7 @@ void GE0DatasetWriter::fillDescriptions(edm::ConfigurationDescriptions& descript
   desc.add<double>("minMuonPt", 5.0); // GeV
   desc.add<unsigned int>("minNumLayers", 4);
   desc.add<unsigned int>("maxNumMuons", 3);
-  descriptions.add("GE0DatasetWriter", desc);
+  descriptions.add("GE0", desc);
 }
 
 GE0DatasetWriter::~GE0DatasetWriter() {
@@ -85,10 +85,15 @@ void GE0DatasetWriter::beginFileService() {
   BRANCH(muon_hit_layer)
   BRANCH(muon_hit_ieta)
   BRANCH(muon_hit_strip)
-  BRANCH_F(muon_bending_x);
-  BRANCH_F(muon_bending_y);
-  BRANCH_L(muon_bending_ieta);
-  BRANCH_L(muon_bending_strip);
+  BRANCH(muon_hit_entry_strip)
+  BRANCH(muon_hit_exit_strip)
+  BRANCH(muon_hit_first_strip)
+  BRANCH(muon_hit_cls)
+  BRANCH(muon_hit_bx)
+  BRANCH_VF(muon_bending_x);
+  BRANCH_VF(muon_bending_y);
+  BRANCH_VL(muon_bending_ieta);
+  BRANCH_VL(muon_bending_strip);
   // GEMDigi
   BRANCH_L(digi_size)
   BRANCH_L(digi_layer_count)
@@ -246,14 +251,14 @@ bool GE0DatasetWriter::isSimTrackGood(edm::SimTrackContainer::const_iterator sim
   return true;
 }
 
-std::vector<GE0SimSegment::LinkData> GE0DatasetWriter::getGE0LinksFromSimTrack(
-    const GE0SimSegment::SimTrackData& sim_track ,
+std::vector<ge0::LinkData> GE0DatasetWriter::getGE0LinksFromSimTrack(
+    const ge0::SimTrackData& sim_track ,
     const edm::Handle<edm::DetSetVector<GEMDigiSimLink> >& link_collection) {
 
   const EncodedEventId&& event_id = sim_track->eventId();
   const unsigned int track_id = sim_track->trackId();
 
-  std::vector<GE0SimSegment::LinkData> output;
+  std::vector<ge0::LinkData> output;
   for (auto link_set = link_collection->begin(); link_set != link_collection->end(); link_set++) {
     if (link_set->empty()) continue;
 
@@ -274,7 +279,7 @@ std::vector<GE0SimSegment::LinkData> GE0DatasetWriter::getGE0LinksFromSimTrack(
 
 
 std::tuple<bool, uint32_t, bool> GE0DatasetWriter::checkSimSegment(
-    const std::vector<GE0SimSegment::LinkData>& link_vector) {
+    const std::vector<ge0::LinkData>& link_vector) {
 
   bool is_good = false;
   uint32_t primary_superchamber{0};
@@ -323,14 +328,14 @@ std::tuple<bool, uint32_t, bool> GE0DatasetWriter::checkSimSegment(
   return std::make_tuple(is_good, primary_superchamber, need_to_prune);
 }
 
-std::vector<GE0SimSegment> GE0DatasetWriter::buildGE0SimSegments(
+std::vector<ge0::GE0SimSegment> GE0DatasetWriter::buildGE0SimSegments(
     const edm::Handle<edm::SimTrackContainer> & sim_track_container,
     const edm::Handle<edm::DetSetVector<GEMDigiSimLink> >& link_collection,
     const edm::Handle<edm::PSimHitContainer> & sim_hit_container,
     const edm::ESHandle<GEMGeometry>& gem) {
 
   // key == {track_id, superchamber raw id}
-  std::vector<GE0SimSegment> sim_segment_collection;
+  std::vector<ge0::GE0SimSegment> sim_segment_collection;
   for (auto sim_track = sim_track_container->begin(); sim_track != sim_track_container->end(); sim_track++) {
     if (not isSimTrackGood(sim_track)) {
       continue;
@@ -352,7 +357,7 @@ std::vector<GE0SimSegment> GE0DatasetWriter::buildGE0SimSegments(
           std::remove_if(
               ge0_links.begin(),
               ge0_links.end(),
-              [&primary_superchamber](const GE0SimSegment::LinkData& link) {
+              [&primary_superchamber](const ge0::LinkData& link) {
                   return GEMDetId{link->getDetUnitId()}.superChamberId().rawId() != primary_superchamber;}),
           ge0_links.end());
     }
@@ -360,8 +365,8 @@ std::vector<GE0SimSegment> GE0DatasetWriter::buildGE0SimSegments(
     const GEMDetId superchamber_id{primary_superchamber};
 
     // only digitized hits are stored.
-    std::vector<GE0SimSegment::SimHitData> ge0_hits;
-    std::map<GE0SimSegment::LinkData, GE0SimSegment::SimHitData> link2hit;
+    // https://github.com/cms-sw/cmssw/blob/CMSSW_12_0_0_pre1/SimMuon/GEMDigitizer/src/GEMSignalModel.cc#L130-L162
+    std::vector<ge0::GE0SimHit> hits;
     for (auto sim_hit = sim_hit_container->begin(); sim_hit != sim_hit_container->end(); sim_hit++) {
       if (sim_track->trackId() != sim_hit->trackId()) continue;
       if (sim_track->eventId() != sim_hit->eventId()) continue;
@@ -372,24 +377,29 @@ std::vector<GE0SimSegment> GE0DatasetWriter::buildGE0SimSegments(
       const LocalPoint hit_entry_point = sim_hit->entryPoint();
       const float hit_tof = sim_hit->timeOfFlight();
 
-      bool is_digitized = false;
-      for (const GE0SimSegment::LinkData& link : ge0_links) {
+      std::vector<ge0::LinkData> cluster;
+      for (const ge0::LinkData& link : ge0_links) {
         const GEMDetId link_gem_id{link->getDetUnitId()};
         if (hit_gem_id != link_gem_id) continue;
         if (not (hit_entry_point == link->getEntryPoint())) continue;
         if (hit_tof != link->getTimeOfFlight()) continue;
-
-        link2hit.emplace(link, sim_hit);
-        is_digitized = true;
+        cluster.push_back(link);
       } // links
 
-      if (is_digitized) {
-        ge0_hits.push_back(sim_hit);
+      if (not cluster.empty()) {
+        const GEMEtaPartition* eta_partition = gem->etaPartition(hit_gem_id);
+        const int strip = static_cast<int>(eta_partition->strip(sim_hit->localPosition()));
+
+        // sort links by strip
+        std::sort(cluster.begin(), cluster.end());
+
+        // FIXME sanity check? bx, adjacency..
+        hits.emplace_back(sim_hit, hit_gem_id.rawId(), strip,
+                          cluster.front()->getBx(), cluster);
       }
     } // simhit
 
-    sim_segment_collection.emplace_back(sim_track, superchamber_id, ge0_links,
-                                        ge0_hits, link2hit);
+    sim_segment_collection.emplace_back(sim_track, superchamber_id, hits);
   } // SimTrackContainer
 
   return sim_segment_collection;
@@ -408,41 +418,47 @@ bool GE0DatasetWriter::matchWithRecHit(const int bx, const int strip, const GEMR
 }
 
 bool GE0DatasetWriter::matchWithRecHit(
-    const GE0SimSegment::LinkData& link, const GEMRecHit& rechit) {
-  return matchWithRecHit(link->getBx(), static_cast<int>(link->getStrip()), rechit);
+    const ge0::GE0SimHit& simhit, const GEMRecHit& rechit) {
+  return matchWithRecHit(simhit.getBx(), simhit.getStrip(), rechit);
 }
+
 
 std::pair<float, unsigned int> GE0DatasetWriter::computeEfficiency(
     const GEMSegmentCollection::const_iterator& rec_segment,
-    const GE0SimSegment* sim_segment) {
+    const ge0::GE0SimSegment* sim_segment) {
 
   const std::vector<GEMRecHit>& rechit_collection = rec_segment->specificRecHits();
-  // digi means the digitized simhits
-  const std::vector<GE0SimSegment::LinkData>& muon_link_collection = sim_segment->links();
+  const std::vector<ge0::GE0SimHit>& simhit_collection = sim_segment->hits();
 
   // Compute the segment-wise efficiency.
   // Efficiency = (# of matched simhits) / (# of simhits)
   unsigned int num_matched = 0;
 
-  for (const auto & link : muon_link_collection) {
+  for (const auto & simhit : simhit_collection) {
+    unsigned int simhit_det_id = simhit.getDetUnitId();
+
     for (const GEMRecHit& rechit : rechit_collection) {
-      if (matchWithRecHit(link, rechit)) {
+      if (simhit_det_id != rechit.gemId().rawId()) {
+        continue;
+      }
+
+      if (matchWithRecHit(simhit, rechit)) {
         num_matched++;
         break;
       }
     } // rechit
   } // digi
 
-  const float efficiency = static_cast<float>(num_matched) / muon_link_collection.size();
+  const float efficiency = static_cast<float>(num_matched) / simhit_collection.size();
   return std::make_pair(efficiency, num_matched);
 }
 
 float GE0DatasetWriter::computeFakeHitRate(
     const GEMSegmentCollection::const_iterator& rec_segment,
-    const GE0SimSegment* sim_segment) {
+    const ge0::GE0SimSegment* sim_segment) {
 
   const std::vector<GEMRecHit>& rechit_collection = rec_segment->specificRecHits();
-  const std::vector<GE0SimSegment::LinkData>&& muon_link_collection = sim_segment->links();
+  const std::vector<ge0::GE0SimHit>&& simhit_collection = sim_segment->hits();
 
   const int num_total = rec_segment->nRecHits();
   int num_fake = 0;
@@ -451,10 +467,10 @@ float GE0DatasetWriter::computeFakeHitRate(
     const uint32_t rechit_id = rechit.gemId().rawId();
 
     bool is_not_matched = true;
-    for (const auto & link : muon_link_collection) {
-      if (rechit_id != link->getDetUnitId()) continue;
+    for (const auto & simhit : simhit_collection) {
+      if (rechit_id != simhit.getDetUnitId()) continue;
       if (is_not_matched) {
-        if (matchWithRecHit(link, rechit)) {
+        if (matchWithRecHit(simhit, rechit)) {
           is_not_matched = false;
           break;
         }
@@ -470,11 +486,11 @@ float GE0DatasetWriter::computeFakeHitRate(
   return static_cast<float>(num_fake) / num_total;
 }
 
-std::vector<const GE0SimSegment*> GE0DatasetWriter::getSimSegmentsInSuperChamber(
-    const std::vector<GE0SimSegment>& sim_segment_collection,
+std::vector<const ge0::GE0SimSegment*> GE0DatasetWriter::getSimSegmentsInSuperChamber(
+    const std::vector<ge0::GE0SimSegment>& sim_segment_collection,
     const GEMDetId & superchamber_id) {
 
-  std::vector<const GE0SimSegment*> gemini_simsegs;
+  std::vector<const ge0::GE0SimSegment*> gemini_simsegs;
 
   for (const auto& sim_segment : sim_segment_collection) {
     if (sim_segment.superChamberId() == superchamber_id) {
@@ -485,7 +501,7 @@ std::vector<const GE0SimSegment*> GE0DatasetWriter::getSimSegmentsInSuperChamber
   // in the decreasing pt order
   if (gemini_simsegs.size() > 1) {
     std::sort(gemini_simsegs.begin(), gemini_simsegs.end(),
-              [](const GE0SimSegment* lhs, const GE0SimSegment* rhs) {
+              [](const ge0::GE0SimSegment* lhs, const ge0::GE0SimSegment* rhs) {
                   return lhs->pt() > rhs->pt();});
   }
 
@@ -508,7 +524,7 @@ void GE0DatasetWriter::analyzeSuperChamber(
 }
 
 void GE0DatasetWriter::analyzeMuon(
-    const std::vector<const GE0SimSegment*>& sim_segment_collection,
+    const std::vector<const ge0::GE0SimSegment*>& sim_segment_collection,
     const edm::ESHandle<GEMGeometry>& gem) {
 
   b_muon_size_ = static_cast<long>(sim_segment_collection.size());
@@ -519,10 +535,15 @@ void GE0DatasetWriter::analyzeMuon(
     b_muon_hit_layer_.resize(b_muon_size_);
     b_muon_hit_ieta_.resize(b_muon_size_);
     b_muon_hit_strip_.resize(b_muon_size_);
+    b_muon_hit_entry_strip_.resize(b_muon_size_);
+    b_muon_hit_exit_strip_.resize(b_muon_size_);
+    b_muon_hit_first_strip_.resize(b_muon_size_);
+    b_muon_hit_cls_.resize(b_muon_size_);
+    b_muon_hit_bx_.resize(b_muon_size_);
   }
 
   for (unsigned int muon_idx = 0; muon_idx < b_muon_size_; muon_idx++) {
-    const GE0SimSegment* sim_segment = sim_segment_collection.at(muon_idx);
+    const ge0::GE0SimSegment* sim_segment = sim_segment_collection.at(muon_idx);
     const GEMSuperChamber* superchamber = gem->superChamber(sim_segment->superChamberId());
     const auto&& muon_ge0_hits = sim_segment->hits();
     const long nhits = static_cast<long>(muon_ge0_hits.size());
@@ -539,13 +560,23 @@ void GE0DatasetWriter::analyzeMuon(
     b_muon_hit_layer_.at(muon_idx).reserve(nhits);
     b_muon_hit_ieta_.at(muon_idx).reserve(nhits);
     b_muon_hit_strip_.at(muon_idx).reserve(nhits);
+    b_muon_hit_entry_strip_.at(muon_idx).reserve(nhits);
+    b_muon_hit_exit_strip_.at(muon_idx).reserve(nhits);
+    b_muon_hit_first_strip_.at(muon_idx).reserve(nhits);
+    b_muon_hit_cls_.at(muon_idx).reserve(nhits);
+    b_muon_hit_bx_.at(muon_idx).reserve(nhits);
+
     for (const auto simhit : muon_ge0_hits) {
-      const GEMDetId gem_id{simhit->detUnitId()};
+      const GEMDetId gem_id{simhit.getDetUnitId()};
 
       const GEMEtaPartition* eta_partition = gem->etaPartition(gem_id);
       const LocalPoint&& hit_pos = getSuperChamberPosition(
-          simhit->localPosition(), superchamber, eta_partition);
-      const long strip = static_cast<long>(eta_partition->strip(simhit->localPosition()));
+          simhit.getLocalPosition(), superchamber, eta_partition);
+      const long strip = static_cast<long>(simhit.getStrip());
+      const long entry_strip = static_cast<long>(eta_partition->strip(simhit.data()->entryPoint()));
+      const long exit_strip = static_cast<long>(eta_partition->strip(simhit.data()->exitPoint()));
+      const long first_strip = static_cast<long>(simhit.getCluster().front()->getStrip());
+      const long cls = static_cast<long>(simhit.getClusterSize());
 
       b_muon_hit_x_.at(muon_idx).push_back(hit_pos.x());
       b_muon_hit_y_.at(muon_idx).push_back(hit_pos.y());
@@ -553,13 +584,17 @@ void GE0DatasetWriter::analyzeMuon(
       b_muon_hit_layer_.at(muon_idx).push_back(gem_id.layer());
       b_muon_hit_ieta_.at(muon_idx).push_back(gem_id.ieta());
       b_muon_hit_strip_.at(muon_idx).push_back(strip);
+      b_muon_hit_entry_strip_.at(muon_idx).push_back(entry_strip);
+      b_muon_hit_exit_strip_.at(muon_idx).push_back(exit_strip);
+      b_muon_hit_first_strip_.at(muon_idx).push_back(first_strip);
+      b_muon_hit_cls_.at(muon_idx).push_back(cls);
+      b_muon_hit_bx_.at(muon_idx).push_back(cls);
     }
 
     std::vector<unsigned int> indices(b_muon_hit_x_.at(muon_idx).size());
     std::iota(indices.begin(), indices.end(), 0u);
 
     const std::vector<long>& layers = b_muon_hit_layer_.at(muon_idx);
-
     const auto layer_argminmax = std::minmax_element(
         indices.begin(), indices.end(),
         [&layers](const long lhs, const long rhs) -> bool {
@@ -589,7 +624,7 @@ void GE0DatasetWriter::analyzeMuon(
 bool GE0DatasetWriter::analyzeDigi(
     const edm::Handle<GEMDigiCollection>& digi_collection,
     const edm::Handle<edm::DetSetVector<GEMDigiSimLink> >& link_collection,
-    const std::vector<const GE0SimSegment*>& sim_segment_collection,
+    const std::vector<const ge0::GE0SimSegment*>& sim_segment_collection,
     const GEMSuperChamber* superchamber) {
 
   Digi2Index digi2idx;
@@ -642,10 +677,10 @@ bool GE0DatasetWriter::analyzeDigi(
     // label 0 means strips fired by background hits or noise
     const long label = static_cast<long>(muon_idx) + 1L;
 
-    for (const auto& link : sim_segment->links()) {
-      const GEMDetId link_gem_id{link->getDetUnitId()};
-      const Digi2Index::key_type digi_key{link_gem_id.layer(), link_gem_id.ieta(),
-                                          static_cast<int>(link->getStrip())};
+    for (const auto& simhit : sim_segment->hits()) {
+      const GEMDetId simhit_gem_id{simhit.getDetUnitId()};
+      const Digi2Index::key_type digi_key{simhit_gem_id.layer(), simhit_gem_id.ieta(),
+                                          simhit.getStrip()};
 
       if (digi2idx.find(digi_key) == digi2idx.end()) {
         edm::LogError(kLogCategory_) << "can't find a muon GEMDigiSimLink in GEMDigis";
@@ -664,7 +699,7 @@ bool GE0DatasetWriter::analyzeDigi(
 
 bool GE0DatasetWriter::analyzePad(
     const edm::Handle<GEMPadDigiCollection>& pad_collection,
-    const std::vector<const GE0SimSegment*>& sim_segment_collection,
+    const std::vector<const ge0::GE0SimSegment*>& sim_segment_collection,
     const GEMSuperChamber* superchamber,
     const edm::ESHandle<GEMGeometry>& gem) {
 
@@ -718,12 +753,12 @@ bool GE0DatasetWriter::analyzePad(
     // label 0 means strips fired by background hits or noise
     const long label = static_cast<long>(muon_idx) + 1L;
 
-    for (const auto& link : sim_segment->links()) {
-      const GEMDetId link_gem_id{link->getDetUnitId()};
-      const GEMEtaPartition* eta_partition = gem->etaPartition(link_gem_id);
-      const int pad = static_cast<int>(eta_partition->padOfStrip(link->getStrip()));
+    for (const auto& simhit : sim_segment->hits()) {
+      const GEMDetId simhit_gem_id{simhit.getDetUnitId()};
+      const GEMEtaPartition* eta_partition = gem->etaPartition(simhit_gem_id);
+      const int pad = static_cast<int>(eta_partition->padOfStrip(simhit.getStrip()));
 
-      const Digi2Index::key_type pad_key{link_gem_id.layer(), link_gem_id.ieta(), pad};
+      const Digi2Index::key_type pad_key{simhit_gem_id.layer(), simhit_gem_id.ieta(), pad};
 
       if (pad2idx.find(pad_key) == pad2idx.end()) {
         edm::LogError(kLogCategory_) << "no GEMPad associated to a muon digi";
@@ -751,7 +786,7 @@ bool GE0DatasetWriter::analyzePad(
 
 bool GE0DatasetWriter::analyzeRecHit(
     const edm::Handle<GEMRecHitCollection>& rechit_collection,
-    const std::vector<const GE0SimSegment*>& sim_segment_collection,
+    const std::vector<const ge0::GE0SimSegment*>& sim_segment_collection,
     const GEMSuperChamber* superchamber,
     const edm::ESHandle<GEMGeometry>& gem) {
 
@@ -794,16 +829,15 @@ bool GE0DatasetWriter::analyzeRecHit(
           auto muon = sim_segment_collection.at(muon_idx);
           const long label = static_cast<long>(muon_idx) + 1L; 
 
-          for (const auto& link : muon->links()) {
-            const GEMDetId link_gem_id{link->getDetUnitId()};
-            if (gem_id != link_gem_id) continue;
+          for (const auto& simhit : muon->hits()) {
+            const GEMDetId simhit_gem_id{simhit.getDetUnitId()};
+            if (gem_id != simhit_gem_id) continue;
 
-            if (matchWithRecHit(link, *rechit)) {
+            if (matchWithRecHit(simhit, *rechit)) {
               label_candidate.insert(label);
 
-              const auto& simhit = muon->getSimHit(link);
               const LocalPoint& simhit_pos = getSuperChamberPosition(
-                  simhit->localPosition(), superchamber, eta_partition);
+                  simhit.getLocalPosition(), superchamber, eta_partition);
 
               dx = superchamber_pos.x() - simhit_pos.x();
               dy = superchamber_pos.y() - simhit_pos.y();
@@ -845,7 +879,7 @@ bool GE0DatasetWriter::analyzeRecHit(
 
 bool GE0DatasetWriter::analyzeSegmentRU(
     const GEMSegmentCollection::range& rec_seg_range,
-    const std::vector<const GE0SimSegment*>& sim_segment_collection,
+    const std::vector<const ge0::GE0SimSegment*>& sim_segment_collection,
     const edm::ESHandle<GEMGeometry>& gem) {
 
   b_ru_size_ = std::distance(rec_seg_range.first, rec_seg_range.second);
@@ -882,7 +916,7 @@ bool GE0DatasetWriter::analyzeSegmentRU(
     float fake_hit_rate = 1.0f;
 
     for (unsigned int muon_idx = 0; muon_idx < sim_segment_collection.size(); muon_idx++) {
-      const GE0SimSegment* sim_segment = sim_segment_collection.at(muon_idx);
+      const ge0::GE0SimSegment* sim_segment = sim_segment_collection.at(muon_idx);
       auto eff_result = computeEfficiency(rec_segment, sim_segment);
       if (eff_result.second >= kMinNumLayers_) {
         asso_muon_idx = static_cast<long>(muon_idx);
@@ -917,7 +951,7 @@ bool GE0DatasetWriter::analyzeSegmentRU(
       const long strip = static_cast<long>(eta_partition->strip(rechit.localPosition()));
 
       rechit_layer.push_back(gem_id.layer());
-      rechit_ieta.push_back(gem_id.layer());
+      rechit_ieta.push_back(gem_id.ieta());
       rechit_strip.push_back(strip);
       rechit_first_strip.push_back(rechit.firstClusterStrip());
       rechit_cls.push_back(rechit.clusterSize());

@@ -51,32 +51,32 @@ class GE0DatasetWriter : public edm::EDAnalyzer {
   
   bool isSimTrackGood(edm::SimTrackContainer::const_iterator);
 
-  std::vector<GE0SimSegment::LinkData> getGE0LinksFromSimTrack(
-      const GE0SimSegment::SimTrackData &,
+  std::vector<ge0::LinkData> getGE0LinksFromSimTrack(
+      const ge0::SimTrackData &,
       const edm::Handle<edm::DetSetVector<GEMDigiSimLink> >&);
 
   std::tuple<bool, uint32_t, bool> checkSimSegment(
-      const std::vector<GE0SimSegment::LinkData>&);
+      const std::vector<ge0::LinkData>&);
 
-  std::vector<GE0SimSegment> buildGE0SimSegments(
+  std::vector<ge0::GE0SimSegment> buildGE0SimSegments(
       const edm::Handle<edm::SimTrackContainer> &,
       const edm::Handle<edm::DetSetVector<GEMDigiSimLink> >&,
       const edm::Handle<edm::PSimHitContainer> &,
       const edm::ESHandle<GEMGeometry>&);
 
   bool matchWithRecHit(const int, const int, const GEMRecHit&); 
-  bool matchWithRecHit(const GE0SimSegment::LinkData&, const GEMRecHit&);
+  bool matchWithRecHit(const ge0::GE0SimHit&, const GEMRecHit&);
 
   std::pair<float, unsigned int> computeEfficiency(
       const GEMSegmentCollection::const_iterator&,
-      const GE0SimSegment*);
+      const ge0::GE0SimSegment*);
 
   float computeFakeHitRate(
       const GEMSegmentCollection::const_iterator&,
-      const GE0SimSegment*);
+      const ge0::GE0SimSegment*);
 
-  std::vector<const GE0SimSegment*> getSimSegmentsInSuperChamber(
-      const std::vector<GE0SimSegment>&,
+  std::vector<const ge0::GE0SimSegment*> getSimSegmentsInSuperChamber(
+      const std::vector<ge0::GE0SimSegment>&,
       const GEMDetId &);
 
   LocalPoint getSuperChamberPosition(
@@ -86,32 +86,32 @@ class GE0DatasetWriter : public edm::EDAnalyzer {
 
   void analyzeSuperChamber(const GEMSuperChamber*);
 
-  void analyzeMuon(const std::vector<const GE0SimSegment*>&,
+  void analyzeMuon(const std::vector<const ge0::GE0SimSegment*>&,
                    const edm::ESHandle<GEMGeometry>&);
 
   bool analyzeDigi(
       const edm::Handle<GEMDigiCollection>&,
       const edm::Handle<edm::DetSetVector<GEMDigiSimLink> >&,
-      const std::vector<const GE0SimSegment*>&,
+      const std::vector<const ge0::GE0SimSegment*>&,
       const GEMSuperChamber*);
 
   void analyzeWindow(const Digi2Index&); 
 
   bool analyzePad(
       const edm::Handle<GEMPadDigiCollection>&,
-      const std::vector<const GE0SimSegment*>&,
+      const std::vector<const ge0::GE0SimSegment*>&,
       const GEMSuperChamber*,
       const edm::ESHandle<GEMGeometry>&);
 
   bool analyzeRecHit(
       const edm::Handle<GEMRecHitCollection>&,
-      const std::vector<const GE0SimSegment*>&,
+      const std::vector<const ge0::GE0SimSegment*>&,
       const GEMSuperChamber*,
       const edm::ESHandle<GEMGeometry>&);
 
   bool analyzeSegmentRU(
       const GEMSegmentCollection::range&,
-      const std::vector<const GE0SimSegment*>&,
+      const std::vector<const ge0::GE0SimSegment*>&,
       const edm::ESHandle<GEMGeometry>&);
 
   template <typename T>
@@ -165,7 +165,12 @@ class GE0DatasetWriter : public edm::EDAnalyzer {
   std::vector<std::vector<float> > b_muon_hit_z_; 
   std::vector<std::vector<long> > b_muon_hit_layer_; 
   std::vector<std::vector<long> > b_muon_hit_ieta_; 
-  std::vector<std::vector<long> > b_muon_hit_strip_;
+  std::vector<std::vector<long> > b_muon_hit_strip_; // - localPosition
+  std::vector<std::vector<long> > b_muon_hit_entry_strip_;
+  std::vector<std::vector<long> > b_muon_hit_exit_strip_;
+  std::vector<std::vector<long> > b_muon_hit_first_strip_; // consider clustering
+  std::vector<std::vector<long> > b_muon_hit_cls_; // clustering
+  std::vector<std::vector<long> > b_muon_hit_bx_;
   std::vector<float> b_muon_bending_x_;
   std::vector<float> b_muon_bending_y_;
   std::vector<long> b_muon_bending_ieta_;

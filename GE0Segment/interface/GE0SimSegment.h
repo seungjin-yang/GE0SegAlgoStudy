@@ -7,23 +7,51 @@
 #include "DataFormats/Common/interface/DetSet.h"
 #include "DataFormats/MuonDetId/interface/GEMDetId.h"
 
+#include <vector>
+
+namespace ge0 {
+using SimTrackData = edm::SimTrackContainer::const_iterator;
+using LinkData = edm::DetSet<GEMDigiSimLink>::const_iterator;
+using SimHitData = edm::PSimHitContainer::const_iterator;
+
+
+class GE0SimHit {
+ public:
+  GE0SimHit(SimHitData hit, unsigned int det_unit_id, int strip, int bx,
+            std::vector<LinkData> cluster) 
+      : hit_(hit), det_unit_id_(det_unit_id), strip_(strip), bx_(bx),
+        cluster_(cluster) {}
+  ~GE0SimHit() {}
+  SimHitData data() const {return hit_;}
+  unsigned int getDetUnitId() const {return det_unit_id_;}
+  std::vector<LinkData> getCluster() const {return cluster_;}
+
+  int getStrip() const {return strip_;}
+  int getBx() const {return bx_;};
+  int getClusterSize() const {return static_cast<int>(cluster_.size());}
+  LocalPoint getLocalPosition() const {return hit_->localPosition();}
+
+ private:
+  SimHitData hit_;
+  unsigned int det_unit_id_;
+  int strip_;
+  int bx_;
+  std::vector<LinkData> cluster_;
+};
+
+
 class GE0SimSegment {
  public:
-  using SimTrackData = edm::SimTrackContainer::const_iterator;
-  using LinkData = edm::DetSet<GEMDigiSimLink>::const_iterator;
-  using SimHitData = edm::PSimHitContainer::const_iterator;
+
 
   GE0SimSegment(SimTrackData sim_track, GEMDetId det_id,
-                std::vector<LinkData> links, std::vector<SimHitData> hits,
-                std::map<LinkData, SimHitData> link2hit)
-      : sim_track_(sim_track), det_id_(det_id), links_(links), hits_(hits),
-        link2hit_(link2hit) {}
+                std::vector<GE0SimHit> hits)
+      : sim_track_(sim_track), det_id_(det_id), hits_(hits) {}
   ~GE0SimSegment() {}
 
   SimTrackData simTrack(void) const {return sim_track_;}
   GEMDetId superChamberId() const {return det_id_;}
-  std::vector<LinkData> links() const {return links_;}
-  std::vector<SimHitData> hits() const {return hits_;}
+  std::vector<GE0SimHit> hits() const {return hits_;}
 
   // helper
   float pt(void) const {return sim_track_->momentum().Pt();}
@@ -32,14 +60,13 @@ class GE0SimSegment {
   float charge(void) const {return sim_track_->charge();} // charge is float!!!
   unsigned int trackId() const {return sim_track_->trackId();}
   int type() const {return sim_track_->type();} // pid
-  SimHitData getSimHit(const LinkData& link) const {return link2hit_.at(link);}
 
  private:
   SimTrackData sim_track_;
   GEMDetId det_id_;
-  std::vector<LinkData> links_;
-  std::vector<SimHitData> hits_;
-  std::map<LinkData, SimHitData> link2hit_;
+  std::vector<GE0SimHit> hits_;
+};
+
 };
 
 #endif // MuonTriggering_GE0Segment_plugins_GE0SimSegment_h
