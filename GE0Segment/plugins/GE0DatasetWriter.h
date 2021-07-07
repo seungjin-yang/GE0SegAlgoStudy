@@ -138,10 +138,10 @@ class GE0DatasetWriter : public edm::EDAnalyzer {
   TH1F* h_num_simseg_;
   TH1F* h_simseg_num_layers_;
 
-  TH1F* h_muon_bending_x_;
-  TH1F* h_muon_bending_y_;
-  TH1F* h_muon_bending_ieta_;
-  TH1F* h_muon_bending_strip_;
+  TH1F* h_muon_delta_x_;
+  TH1F* h_muon_delta_y_;
+  TH1F* h_muon_delta_ieta_;
+  TH1F* h_muon_delta_strip_;
 
   TH1F* h_hit_dx_;
   TH1F* h_hit_dy_;
@@ -171,10 +171,10 @@ class GE0DatasetWriter : public edm::EDAnalyzer {
   std::vector<std::vector<long> > b_muon_hit_first_strip_; // consider clustering
   std::vector<std::vector<long> > b_muon_hit_cls_; // clustering
   std::vector<std::vector<long> > b_muon_hit_bx_;
-  std::vector<float> b_muon_bending_x_;
-  std::vector<float> b_muon_bending_y_;
-  std::vector<long> b_muon_bending_ieta_;
-  std::vector<long> b_muon_bending_strip_;
+  std::vector<float> b_muon_delta_x_;
+  std::vector<float> b_muon_delta_y_;
+  std::vector<long> b_muon_delta_ieta_;
+  std::vector<long> b_muon_delta_strip_;
   // GEMDigi
   long b_digi_size_;
   long b_digi_layer_count_;
@@ -201,10 +201,17 @@ class GE0DatasetWriter : public edm::EDAnalyzer {
   std::vector<float> b_rechit_x_;
   std::vector<float> b_rechit_y_;
   std::vector<float> b_rechit_z_;
+  std::vector<float> b_rechit_x_minmax_;
+  std::vector<float> b_rechit_y_minmax_;
+  std::vector<float> b_rechit_z_minmax_;
   std::vector<float> b_rechit_err_xx_;
   std::vector<float> b_rechit_err_xy_;
   std::vector<float> b_rechit_err_yy_;
   std::vector<long> b_rechit_label_;
+  std::vector<long> b_rechit_label_first_ieta_; // innermost
+  std::vector<long> b_rechit_label_first_strip_;
+  std::vector<long> b_rechit_label_last_ieta_; // outermost
+  std::vector<long> b_rechit_label_last_strip_;
   // GEMSegments built by RU (Road Usage) algorithm
   long b_ru_size_;
   std::vector<long> b_ru_muon_idx_;

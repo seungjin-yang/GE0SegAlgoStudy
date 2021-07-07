@@ -1,4 +1,5 @@
 #include "MuonTriggering/GE0Segment/plugins/GE0DatasetWriter.h"
+#include "MuonTriggering/GE0Segment/interface/MinMaxScaler.h"
 
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "DataFormats/GeometryCommonDetAlgo/interface/ErrorFrameTransformer.h"
@@ -90,10 +91,10 @@ void GE0DatasetWriter::beginFileService() {
   BRANCH(muon_hit_first_strip)
   BRANCH(muon_hit_cls)
   BRANCH(muon_hit_bx)
-  BRANCH_VF(muon_bending_x);
-  BRANCH_VF(muon_bending_y);
-  BRANCH_VL(muon_bending_ieta);
-  BRANCH_VL(muon_bending_strip);
+  BRANCH_VF(muon_delta_x);
+  BRANCH_VF(muon_delta_y);
+  BRANCH_VL(muon_delta_ieta);
+  BRANCH_VL(muon_delta_strip);
   // GEMDigi
   BRANCH_L(digi_size)
   BRANCH_L(digi_layer_count)
@@ -120,10 +121,17 @@ void GE0DatasetWriter::beginFileService() {
   BRANCH_VF(rechit_x)
   BRANCH_VF(rechit_y)
   BRANCH_VF(rechit_z)
+  BRANCH_VF(rechit_x_minmax)
+  BRANCH_VF(rechit_y_minmax)
+  BRANCH_VF(rechit_z_minmax)
   BRANCH_VF(rechit_err_xx)
   BRANCH_VF(rechit_err_xy)
   BRANCH_VF(rechit_err_yy)
   BRANCH_VL(rechit_label)
+  BRANCH_VL(rechit_label_first_ieta)
+  BRANCH_VL(rechit_label_first_strip)
+  BRANCH_VL(rechit_label_last_ieta)
+  BRANCH_VL(rechit_label_last_strip)
   // GEMSegment by Road Usage
   BRANCH_L(ru_size)
   BRANCH_VL(ru_rechit_size)
@@ -150,10 +158,10 @@ void GE0DatasetWriter::beginFileService() {
   h_num_simseg_ = file_service_->make<TH1F>("h_num_simseg", "", 11, -0.5, 10.5);
   h_simseg_num_layers_ = file_service_->make<TH1F>("h_simseg_num_layers", "", 8, -0.5, 7.5);
 
-  h_muon_bending_x_ = file_service_->make<TH1F>("h_muon_bending_x", "", 20, -2, 2);
-  h_muon_bending_y_ = file_service_->make<TH1F>("h_muon_bending_y", "", 20, 0, 10);
-  h_muon_bending_ieta_ = file_service_->make<TH1F>("h_muon_bending_ieta", "", 5, -2.5, 2.5);
-  h_muon_bending_strip_ = file_service_->make<TH1F>("h_muon_bending_strip", "", 21, -10.5, 10.5);
+  h_muon_delta_x_ = file_service_->make<TH1F>("h_muon_delta_x", "", 20, -2, 2);
+  h_muon_delta_y_ = file_service_->make<TH1F>("h_muon_delta_y", "", 20, 0, 10);
+  h_muon_delta_ieta_ = file_service_->make<TH1F>("h_muon_delta_ieta", "", 5, -2.5, 2.5);
+  h_muon_delta_strip_ = file_service_->make<TH1F>("h_muon_delta_strip", "", 21, -10.5, 10.5);
 
   h_hit_dx_ = file_service_->make<TH1F>("h_hit_dx", "", 20, -2, 2);
   h_hit_dy_ = file_service_->make<TH1F>("h_hit_dy", "", 20, -10, 10);
@@ -181,10 +189,10 @@ void GE0DatasetWriter::resetBranch() {
   b_muon_hit_layer_.clear();
   b_muon_hit_ieta_.clear();
   b_muon_hit_strip_.clear();
-  b_muon_bending_x_.clear();
-  b_muon_bending_y_.clear();
-  b_muon_bending_ieta_.clear();
-  b_muon_bending_strip_.clear();
+  b_muon_delta_x_.clear();
+  b_muon_delta_y_.clear();
+  b_muon_delta_ieta_.clear();
+  b_muon_delta_strip_.clear();
   // GEMDigi
   b_digi_size_ = -1L;
   b_digi_layer_count_ = -1L;
@@ -210,10 +218,17 @@ void GE0DatasetWriter::resetBranch() {
   b_rechit_x_.clear();
   b_rechit_y_.clear();
   b_rechit_z_.clear();
+  b_rechit_x_minmax_.clear();
+  b_rechit_y_minmax_.clear();
+  b_rechit_z_minmax_.clear();
   b_rechit_err_xx_.clear();
   b_rechit_err_xy_.clear();
   b_rechit_err_yy_.clear();
   b_rechit_label_.clear();
+  b_rechit_label_first_ieta_.clear();
+  b_rechit_label_first_strip_.clear();
+  b_rechit_label_last_ieta_.clear();
+  b_rechit_label_last_strip_.clear();
   // GEMSegment by Road Usage
   b_ru_size_ = -1L;
   b_ru_muon_idx_.clear();
@@ -599,24 +614,23 @@ void GE0DatasetWriter::analyzeMuon(
         indices.begin(), indices.end(),
         [&layers](const long lhs, const long rhs) -> bool {
             return layers.at(lhs) < layers.at(rhs);});
-
     const auto layer_argmin = *(layer_argminmax.first);
     const auto layer_argmax = *(layer_argminmax.second);
 
-    const float bending_x = b_muon_hit_x_.at(muon_idx).at(layer_argmax) - b_muon_hit_x_.at(muon_idx).at(layer_argmin);
-    const float bending_y = b_muon_hit_y_.at(muon_idx).at(layer_argmax) - b_muon_hit_y_.at(muon_idx).at(layer_argmin);
-    const long bending_ieta = b_muon_hit_ieta_.at(muon_idx).at(layer_argmax) - b_muon_hit_ieta_.at(muon_idx).at(layer_argmin);
-    const long bending_strip = b_muon_hit_strip_.at(muon_idx).at(layer_argmax) - b_muon_hit_strip_.at(muon_idx).at(layer_argmin);
+    const float delta_x = b_muon_hit_x_.at(muon_idx).at(layer_argmax) - b_muon_hit_x_.at(muon_idx).at(layer_argmin);
+    const float delta_y = b_muon_hit_y_.at(muon_idx).at(layer_argmax) - b_muon_hit_y_.at(muon_idx).at(layer_argmin);
+    const long delta_ieta = b_muon_hit_ieta_.at(muon_idx).at(layer_argmax) - b_muon_hit_ieta_.at(muon_idx).at(layer_argmin);
+    const long delta_strip = b_muon_hit_strip_.at(muon_idx).at(layer_argmax) - b_muon_hit_strip_.at(muon_idx).at(layer_argmin);
 
-    b_muon_bending_x_.push_back(bending_x);
-    b_muon_bending_y_.push_back(bending_y);
-    b_muon_bending_ieta_.push_back(bending_ieta);
-    b_muon_bending_strip_.push_back(bending_strip);
+    b_muon_delta_x_.push_back(delta_x);
+    b_muon_delta_y_.push_back(delta_y);
+    b_muon_delta_ieta_.push_back(delta_ieta);
+    b_muon_delta_strip_.push_back(delta_strip);
 
-    h_muon_bending_x_->Fill(bending_x);
-    h_muon_bending_y_->Fill(bending_y);
-    h_muon_bending_ieta_->Fill(std::clamp(bending_ieta, -2L, 2L));
-    h_muon_bending_strip_->Fill(std::clamp(bending_strip, -10L, 10L));
+    h_muon_delta_x_->Fill(delta_x);
+    h_muon_delta_y_->Fill(delta_y);
+    h_muon_delta_ieta_->Fill(std::clamp(delta_ieta, -2L, 2L));
+    h_muon_delta_strip_->Fill(std::clamp(delta_strip, -10L, 10L));
 
   } // muon
 }
@@ -790,6 +804,9 @@ bool GE0DatasetWriter::analyzeRecHit(
     const GEMSuperChamber* superchamber,
     const edm::ESHandle<GEMGeometry>& gem) {
 
+   
+  GE0Scaler scaler{superchamber};
+
   for (const GEMChamber* chamber : superchamber->chambers()) {
     for (const GEMEtaPartition* eta_partition : chamber->etaPartitions()) {
       const GEMDetId & gem_id = eta_partition->id();
@@ -809,22 +826,32 @@ bool GE0DatasetWriter::analyzeRecHit(
             global_err, superchamber->surface());
         const long strip = static_cast<long>(eta_partition->strip(local_pos));
 
+        const float rechit_x = superchamber_pos.x();
+        const float rechit_y = superchamber_pos.y();
+        const float rechit_z = superchamber_pos.z();
+        const float rechit_x_minmax = scaler.transformX(rechit_x);
+        const float rechit_y_minmax = scaler.transformY(rechit_y);
+        const float rechit_z_minmax = scaler.transformZ(rechit_z);
+
         b_rechit_layer_.push_back(layer);
         b_rechit_ieta_.push_back(ieta);
         b_rechit_strip_.push_back(strip);
         b_rechit_bx_.push_back(static_cast<long>(rechit->BunchX()));
         b_rechit_first_strip_.push_back(static_cast<long>(rechit->firstClusterStrip()));
         b_rechit_cls_.push_back(static_cast<long>(rechit->clusterSize()));
-        b_rechit_x_.push_back(superchamber_pos.x());
-        b_rechit_y_.push_back(superchamber_pos.y());
-        b_rechit_z_.push_back(superchamber_pos.z());
+        b_rechit_x_.push_back(rechit_x);
+        b_rechit_y_.push_back(rechit_y);
+        b_rechit_z_.push_back(rechit_z);
+        b_rechit_x_minmax_.push_back(rechit_x_minmax);
+        b_rechit_y_minmax_.push_back(rechit_y_minmax);
+        b_rechit_z_minmax_.push_back(rechit_z_minmax);
         b_rechit_err_xx_.push_back(superchamber_err.xx());
         b_rechit_err_xy_.push_back(superchamber_err.xy());
         b_rechit_err_yy_.push_back(superchamber_err.yy());
 
         // label 0 means strips fired by background hits or noise
         std::set<long> label_candidate;
-        float dx = 100.0f, dy = 100.0f, sx = 100.0f, sy = 100.0f;
+        float dx = 1e4f, dy = 1e4f, sx = 1e4f, sy = 1e4f;
         for (unsigned int muon_idx = 0; muon_idx < sim_segment_collection.size(); muon_idx++) {
           auto muon = sim_segment_collection.at(muon_idx);
           const long label = static_cast<long>(muon_idx) + 1L; 
@@ -850,10 +877,34 @@ bool GE0DatasetWriter::analyzeRecHit(
         } // muon
 
         if (label_candidate.empty()) {
-          b_rechit_label_.push_back(0);
+          b_rechit_label_.push_back(0L);
+          b_rechit_label_first_ieta_.push_back(0L);
+          b_rechit_label_first_strip_.push_back(0L);
+          b_rechit_label_last_ieta_.push_back(0L);
+          b_rechit_label_last_strip_.push_back(0L);
 
         } else if (label_candidate.size() == 1) {
-          b_rechit_label_.push_back(*label_candidate.begin());
+          const long label = *label_candidate.begin();
+          const long muon_idx = label - 1;
+
+          const std::vector<long>& layers = b_muon_hit_layer_.at(muon_idx);
+          const std::vector<long>& ietas = b_muon_hit_ieta_.at(muon_idx);
+          const std::vector<long>& strips = b_muon_hit_strip_.at(muon_idx);
+
+          std::vector<unsigned int> indices(layers.size());
+          std::iota(indices.begin(), indices.end(), 0u);
+          const auto layer_argminmax = std::minmax_element(
+              indices.begin(), indices.end(),
+              [&layers](const long lhs, const long rhs) -> bool {
+                  return layers.at(lhs) < layers.at(rhs);});
+          const auto layer_argmin = *(layer_argminmax.first);
+          const auto layer_argmax = *(layer_argminmax.second);
+
+          b_rechit_label_.push_back(label);
+          b_rechit_label_first_ieta_.push_back(ietas.at(layer_argmin));
+          b_rechit_label_first_strip_.push_back(strips.at(layer_argmin));
+          b_rechit_label_last_ieta_.push_back(ietas.at(layer_argmax));
+          b_rechit_label_last_strip_.push_back(strips.at(layer_argmax));
 
           h_hit_dx_->Fill(dx);
           h_hit_dy_->Fill(dy);
@@ -1085,6 +1136,8 @@ void GE0DatasetWriter::analyze(const edm::Event& event, const edm::EventSetup& s
   const auto&& sim_segment_collection = buildGE0SimSegments(
       sim_track_container, link_collection, sim_hit_container, gem);
   h_num_simseg_->Fill(std::min(static_cast<int>(sim_segment_collection.size()), 10));
+
+  std::map<int, MinMaxScaler> scalers;
 
   for (const GEMStation* station : gem->stations()) {
     if (station->station() != 0) {
