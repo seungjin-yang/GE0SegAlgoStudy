@@ -1,7 +1,7 @@
-#ifndef MuonTriggering_GE0Segment_GE0DatasetWriter_h
-#define MuonTriggering_GE0Segment_GE0DatasetWriter_h
+#ifndef GE0SegAlgoStudy_GE0Segment_GE0DatasetWriter_h
+#define GE0SegAlgoStudy_GE0Segment_GE0DatasetWriter_h
 
-#include "MuonTriggering/GE0Segment/interface/GE0SimSegment.h"
+#include "GE0SegAlgoStudy/GE0Segment/interface/GE0SimSegment.h"
 
 #include "FWCore/Framework/interface/Frameworkfwd.h"
 #include "FWCore/Framework/interface/Event.h"
@@ -241,4 +241,4 @@ inline unsigned int GE0DatasetWriter::countUnique(const std::vector<T>& v) {
   return us.size();
 }
 
-#endif // MuonTriggering_GE0Segment_GE0DatasetWriter_h
+#endif // GE0SegAlgoStudy_GE0Segment_GE0DatasetWriter_h
